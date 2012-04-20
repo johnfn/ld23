@@ -2,6 +2,8 @@ import sys, pygame, spritesheet, wordwrap
 
 WIDTH = HEIGHT = 500
 TILE_SIZE = 20
+VISIBLE_MAP_SIZE = 10
+CHAR_XY = VISIBLE_MAP_SIZE * TILE_SIZE / 2
 
 DEBUG = True
 
@@ -175,7 +177,7 @@ class Entities:
 class Map(Entity):
   def __init__(self):
     self.full_map_size = 20
-    self.visible_map_size = 10
+    self.visible_map_size = VISIBLE_MAP_SIZE
 
     super(Map, self).__init__(0, 0, ["updateable"])
 
@@ -286,7 +288,7 @@ def render_all(manager):
   y_ofs = ch.y
 
   for e in manager.get("renderable"):
-    e.render(screen, -x_ofs, -y_ofs)
+    e.render(screen, CHAR_XY-x_ofs, CHAR_XY-y_ofs)
 
 def main():
   manager = Entities()
