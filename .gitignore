@@ -1,0 +1,4 @@
+*.xcf
+*.pyc
+*.sw?
+frame.*
