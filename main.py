@@ -211,8 +211,10 @@ class Particles(Entity):
     super(Particles, self).__init__(0, 0, ["renderable", "updateable", "relative"])
     self.particles = []
     self.particle_sources = particle_sources
+    self.tick = 0
 
   def update(self, entities):
+    self.tick += 1
     self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
 
     for source in self.particle_sources:
@@ -220,6 +222,11 @@ class Particles(Entity):
         p = Particle(source[0], source[1])
         self.particles.append(p)
         entities.add(p)
+
+        if len(self.particles) > 20:
+          removed = random.choice(self.particles)
+          self.particles.remove(removed)
+          entities.remove(removed)
 
     for p in self.particles:
       p.update()
