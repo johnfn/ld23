@@ -292,21 +292,35 @@ class LightSpot(Entity):
 
 # ALL the light in the game. ALL OF IT. Make it blurry, yo. Beacon it up in here. LOL BEACON? I DONT KNOW WHAT BEACON IS. ISNT THAT A CRISPY BREAKFAST FOOD? IVE NEVER HEARD OF IT LOL.
 class Light(Entity):
-  def __init__(self, dark_values, light_objs):
+  def __init__(self, dark_values, light_objs, entities, m):
     #TODO: constants.
 
     self.light_objs = light_objs
-    self.dark_values = dark_values
-
-    self.recalculate_light()
+    self.recalculate_light(entities, m)
 
     super(Light, self).__init__(0, 0, ["renderable", "relative", "all-lights"], 5, 0, "tiles.png")
 
   def depth(self):
     return LIGHT_DEPTH
 
-  def recalculate_light(self):
-    self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
+  def calculate_ambient_light(self, entities, m):
+    dark_values = [[255 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
+
+    for source in entities.get("light-source"):
+      light_deltas = source.calculate_light_deltas(entities, m)
+      for i, elem in enumerate(light_deltas):
+        for j, delta in enumerate(elem):
+          dark_values[i][j] += delta
+
+          if dark_values[i][j] > 255: dark_values[i][j] = 255
+          if dark_values[i][j] < 0: dark_values[i][j] = 0
+
+    self.dark_values = dark_values
+
+  def recalculate_light(self, entities, m):
+    self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA)
+
+    self.calculate_ambient_light(entities, m)
 
     # calculate ambient light of each (x,y) position.
     self.spots = [[None for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
@@ -481,20 +495,12 @@ class Map(Entity):
     for source in light_sources:
       #TODO: Ther eis no differentiation between BEAM and RADIAL at this point.
       new_l = LightSource(source[0], source[1], entities, self, LightSource.BEAM)
-      light_deltas = new_l.calculate_light_deltas(entities, self)
-      for i, elem in enumerate(light_deltas):
-        for j, delta in enumerate(elem):
-          dark_values[i][j] += delta
-
-          if dark_values[i][j] > 255: dark_values[i][j] = 255
-          if dark_values[i][j] < 0: dark_values[i][j] = 0
-
       light_objs.append(new_l)
       entities.add(new_l)
 
     # the only things that generate particles currently are lights. thats why i pass in light_objs, not particle_objs.
     entities.add(Particles(entities, light_objs))
-    entities.add(Light(dark_values, light_objs))
+    entities.add(Light(dark_values, light_objs, entities, self))
     self.light_deltas = dark_values
 
 
@@ -680,7 +686,7 @@ class LightSource(Entity):
     self.falloff = 60
     self.lightbeampos = []
 
-    super(LightSource, self).__init__(x, y, ["wall", "renderable", "relative", "updateable", "map_element", "lightsource"], 5, 0, "tiles.png")
+    super(LightSource, self).__init__(x, y, ["wall", "renderable", "relative", "updateable", "map_element", "light-source"], 5, 0, "tiles.png")
 
     if light_type == LightSource.BEAM:
       self.groups.append("beamlight")
@@ -700,7 +706,7 @@ class LightSource(Entity):
     self.x = x
     self.y = y
 
-    entities.one("all-lights").recalculate_light()
+    entities.one("all-lights").recalculate_light(entities, entities.one("map"))
 
   def calculate_light_deltas(self, entities, m):
     if self.light_type == LightSource.BEAM:
