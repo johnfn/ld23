@@ -5,6 +5,7 @@ TILE_SIZE = 20
 VISIBLE_MAP_SIZE = 10
 CHAR_XY = WIDTH / 2
 GRAVITY = 3
+MAP_SIZE = 20
 
 DEBUG = True
 
@@ -185,6 +186,9 @@ class Entities:
 
     self.entities = retained
 
+def tupleize(color):
+  return (color.r, color.g, color.b)
+
 class Map(Entity):
   def __init__(self):
     self.full_map_size = 20
@@ -198,39 +202,22 @@ class Map(Entity):
   def new_map(self, entities):
     entities.remove_all("map_element")
 
-    data = [[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
-            ]
+    self.mapdata = TileSheet.get('map.png', 0, 0)
 
-    self.tiles = []
+    mapping = { (0, 0, 0): 1
+              , (255, 255, 255): 0
+              }
 
-    for i, line in enumerate(data):
-      for j, data in enumerate(line):
-        if data == 0:
-          tile = Tile(j * TILE_SIZE, i * TILE_SIZE, 0, 0)
-        elif data == 1:
-          tile = Tile(j * TILE_SIZE, i * TILE_SIZE, 1, 0)
+    for i in range(MAP_SIZE):
+      for j in range(MAP_SIZE):
+        colors = mapping[tupleize(self.mapdata.get_at((i, j)))]
+
+        if colors == 0:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+        elif colors == 1:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 1, 0)
           tile.add_group("wall")
 
-        self.tiles.append({'tile': tile, 'i': i, 'j': j})
         tile.add_group("map_element")
         entities.add(tile)
 
@@ -298,13 +285,13 @@ class Character(Entity):
 
     self.x += dx
     while self.collides_with_wall(entities):
-      self.x -= sign(dx)
+      self.x -= sign(dx) or -1
 
     self.y += dy
     ground = False
     while self.collides_with_wall(entities):
       ground = True
-      self.y -= sign(dy)
+      self.y -= sign(dy) or -1
 
     if ground:
       dy = 0
