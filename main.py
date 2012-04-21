@@ -4,7 +4,7 @@ WIDTH = HEIGHT = 300
 TILE_SIZE = 20
 VISIBLE_MAP_SIZE = 10
 CHAR_XY = WIDTH / 2
-GRAVITY = 3
+GRAVITY = 2
 MAP_SIZE = 20
 
 DEBUG = True
@@ -131,7 +131,7 @@ class Entity(object):
 
 class Tile(Entity):
   def __init__(self, x, y, tx, ty):
-    super(Tile, self).__init__(x, y, ["renderable", "updateable", "relative"], tx, ty, "tiles.bmp")
+    super(Tile, self).__init__(x, y, ["renderable", "updateable", "relative"], tx, ty, "tiles.png")
 
   def update(self, entities):
     pass
@@ -262,6 +262,7 @@ class Character(Entity):
     super(Character, self).__init__(x, y, ["renderable", "updateable", "character", "relative"], 0, 1, "tiles.bmp")
     self.speed = 5
     self.vy = 0
+    self.onground = False
 
   def collides_with_wall(self, entities):
     nr = self.nicer_rect()
@@ -270,10 +271,10 @@ class Character(Entity):
   def update(self, entities):
     dx, dy = (0, 0)
 
-    if UpKeys.key_down(pygame.K_DOWN): dy += self.speed
-    if UpKeys.key_down(pygame.K_UP): dy -= self.speed
     if UpKeys.key_down(pygame.K_LEFT): dx -= self.speed
     if UpKeys.key_down(pygame.K_RIGHT): dx += self.speed
+    if UpKeys.key_down(pygame.K_SPACE):
+      dy = -20
 
     self.vy -= GRAVITY
     dy -= self.vy
@@ -288,13 +289,19 @@ class Character(Entity):
       self.x -= sign(dx) or -1
 
     self.y += dy
-    ground = False
     while self.collides_with_wall(entities):
-      ground = True
       self.y -= sign(dy) or -1
 
-    if ground:
+    self.onground = False
+
+    for p in zip(range(self.x + 2, self.x + self.size - 2), [self.y + self.size + 1] * self.size):
+      if entities.any("wall", lambda x: x.touches_point(Point(*p))):
+        self.onground = True
+        break
+
+    if self.onground:
       dy = 0
+      self.vy = 0
 
 def render_all(manager):
   ch = manager.one("character")
