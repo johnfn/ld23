@@ -17,6 +17,7 @@ NOT_DARK = 0
 #aesthestics
 
 JIGGLE_LENGTH = 50
+JIGG_RANGE = 3
 
 #gameplay
 
@@ -199,8 +200,8 @@ class Entity(object):
 
   def update(self, entities):
     if self.jiggling > 0:
-      self.x = self.x + random.randrange(-5, 5)
-      self.y = self.y + random.randrange(-5, 5)
+      self.x = self.x + random.randrange(-JIGG_RANGE, JIGG_RANGE)
+      self.y = self.y + random.randrange(-JIGG_RANGE, JIGG_RANGE)
       self.jiggling -= 1
 
     if self.flashing > 0:
@@ -834,10 +835,14 @@ class Character(Entity):
 
     if not m.get_lighting_rel(int(self.x/20), int(self.y/20)) > INSANE_LIGHT: 
       if self.sanity < self.max_sanity:
-        if Tick.get(6): self.sanity += 1
+        if Tick.get(6): 
+          self.sanity += 1
+          self.sanity_bar.jiggling = 0
       return
 
-    if Tick.get(10): self.sanity -= 1
+    if Tick.get(20): 
+      self.sanity -= 1
+      self.sanity_bar.jiggling = 20
 
     if self.sanity <= 0:
       self.soft_death()
