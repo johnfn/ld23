@@ -5,7 +5,8 @@ TILE_SIZE = 20
 VISIBLE_MAP_SIZE = 10
 CHAR_XY = WIDTH / 2
 GRAVITY = 2
-MAP_SIZE = 20
+MAP_SIZE_TILES = 20
+MAP_SIZE_PIXELS = MAP_SIZE_TILES * TILE_SIZE
 
 DEBUG = True
 
@@ -192,24 +193,31 @@ def tupleize(color):
 class Map(Entity):
   def __init__(self):
     self.full_map_size = 20
+    self.mapx = 0
+    self.mapy = 0
     self.visible_map_size = VISIBLE_MAP_SIZE
 
-    super(Map, self).__init__(0, 0, ["updateable"])
+    super(Map, self).__init__(0, 0, ["updateable", "map"])
 
   def update(self, entities):
     pass
 
-  def new_map(self, entities):
+  def new_map_rel(self, entities, dx, dy):
+    self.new_map_abs(entities, self.mapx + dx, self.mapy + dy)
+
+  def new_map_abs(self, entities, x, y):
+    self.mapx = x
+    self.mapy = y
     entities.remove_all("map_element")
 
-    self.mapdata = TileSheet.get('map.png', 0, 0)
+    self.mapdata = TileSheet.get('map.png', self.mapx, self.mapy)
 
     mapping = { (0, 0, 0): 1
               , (255, 255, 255): 0
               }
 
-    for i in range(MAP_SIZE):
-      for j in range(MAP_SIZE):
+    for i in range(MAP_SIZE_TILES):
+      for j in range(MAP_SIZE_TILES):
         colors = mapping[tupleize(self.mapdata.get_at((i, j)))]
 
         if colors == 0:
@@ -268,13 +276,27 @@ class Character(Entity):
     nr = self.nicer_rect()
     return entities.any("wall", lambda x: x.touches_rect(nr))
 
+  def check_new_map(self, entities):
+    m = entities.one("map")
+    d = (0, 0)
+
+    if self.x + self.size > MAP_SIZE_PIXELS: d = (1, 0)
+    if self.x < 0: d = (-1, 0)
+    if self.y + self.size > MAP_SIZE_PIXELS: d = (0, 1)
+    if self.y < 0: d = (0, -1)
+
+    if d != (0, 0):
+      m.new_map_rel(entities, *d)
+
+      self.x -= (MAP_SIZE_PIXELS - TILE_SIZE) * d[0]
+      self.y -= (MAP_SIZE_PIXELS - TILE_SIZE) * d[1]
+
   def update(self, entities):
     dx, dy = (0, 0)
 
     if UpKeys.key_down(pygame.K_LEFT): dx -= self.speed
     if UpKeys.key_down(pygame.K_RIGHT): dx += self.speed
-    if UpKeys.key_down(pygame.K_SPACE):
-      dy = -20
+    if UpKeys.key_down(pygame.K_SPACE): dy = -20
 
     self.vy -= GRAVITY
     dy -= self.vy
@@ -303,6 +325,8 @@ class Character(Entity):
       dy = 0
       self.vy = 0
 
+    self.check_new_map(entities)
+
 def render_all(manager):
   ch = manager.one("character")
   x_ofs = max(min(ch.x, 400 - CHAR_XY), CHAR_XY)
@@ -316,7 +340,7 @@ def main():
   manager.add(Character(40, 40))
 
   m = Map()
-  m.new_map(manager)
+  m.new_map_abs(manager, 0, 0)
   manager.add(m)
 
   pygame.display.init()
