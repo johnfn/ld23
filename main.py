@@ -205,24 +205,24 @@ class Entity(object):
       self.flashing -= 1
 
 class Particles(Entity):
-  NUM_PARTICLES = 100
-
-  def __init__(self, entities):
+  def __init__(self, entities, particle_sources):
     self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
 
     super(Particles, self).__init__(0, 0, ["renderable", "updateable", "relative"])
     self.particles = []
-
-    for x in range(Particles.NUM_PARTICLES):
-      #TODO So many tweakable constants.
-      p = Particle(200 + random.randrange(-100, 100), 200 + random.randrange(-100, 100))
-      self.particles.append(p)
-      entities.add(p)
+    self.particle_sources = particle_sources
 
   def update(self, entities):
     self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
 
+    for source in self.particle_sources:
+      if random.random() > .8:
+        p = Particle(source[0], source[1])
+        self.particles.append(p)
+        entities.add(p)
+
     for p in self.particles:
+      p.update()
       p.render(self.surf)
 
     self.surf = blur_surf(self.surf, 5.0)
@@ -237,11 +237,28 @@ class Particles(Entity):
 class Particle(Entity):
   def __init__(self, x, y):
     self.x = x
+    self.x_init = x
     self.y = y
+    self.speed = random.random() * 2 + 0.4
+    self.tick = 0
+    self.sin_width = random.random() * 25 + 3
+    self.sin_offset = random.random() * 5 + 5
+    self.sin_speed = random.random() / 3
 
     super(Particle, self).__init__(x, y, [], 7, 0, "tiles.png")
     self.trans_img = self.img.copy()
     self.trans_img.set_colorkey((0, 0, 0))
+
+    # force start at source
+    first_x = self.x_init + math.sin(self.sin_offset + self.sin_speed * self.tick/10) * self.sin_width
+    diff_x = self.x - first_x
+    self.x_init = self.x_init + diff_x
+    self.x = self.x_init
+
+  def update(self):
+    self.tick += 1
+    self.y -= self.speed
+    self.x = self.x_init + math.sin(self.sin_offset + self.sin_speed * self.tick/10) * self.sin_width
 
   def render(self, screen):
     screen.blit(self.trans_img, (self.x, self.y))
@@ -389,6 +406,8 @@ class Map(Entity):
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
 
     light_sources = []
+    particle_sources = []
+
     for i in range(MAP_SIZE_TILES):
       for j in range(MAP_SIZE_TILES):
         colors = mapping[tupleize(self.mapdata.get_at((i, j)))]
@@ -404,6 +423,7 @@ class Map(Entity):
         elif colors == 3:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           light_sources.append([i * TILE_SIZE, j * TILE_SIZE])
+          particle_sources.append([i * TILE_SIZE, j * TILE_SIZE])
         elif colors == 4:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           entities.add(Reflector(i * TILE_SIZE, j * TILE_SIZE, None))
@@ -413,6 +433,7 @@ class Map(Entity):
         self.tiles[i][j] = tile
 
     self.calculate_lighting(light_sources, entities)
+    entities.add(Particles(entities, particle_sources))
 
   def is_wall_rel(self, i, j):
     return "wall" in self.tiles[i][j].groups
@@ -444,7 +465,6 @@ class Map(Entity):
     """
 
     entities.add(Light(dark_values))
-    entities.add(Particles(entities))
     self.light_deltas = dark_values
 
 
