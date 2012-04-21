@@ -330,7 +330,7 @@ class Map(Entity):
     self.new_map_abs(entities, self.mapx + dx, self.mapy + dy)
 
   def in_bounds(self, point):
-    return point[0] >= 0 and point[1] >= 0 and point[0] <= MAP_SIZE_PIXELS and point[1] <= MAP_SIZE_PIXELS
+    return point[0] >= 0 and point[1] >= 0 and point[0] < MAP_SIZE_PIXELS and point[1] < MAP_SIZE_PIXELS
 
   def new_map_abs(self, entities, x, y):
     self.mapx = x
@@ -374,13 +374,16 @@ class Map(Entity):
 
     self.calculate_lighting(light_sources, entities)
 
+  def is_wall_rel(self, i, j):
+    return "wall" in self.tiles[i][j].groups
+
   def calculate_lighting(self, light_sources, entities):
     # everything starts dark.
     dark_values = [[255 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
 
     # Sources need to be aware of the entire map, so we add them last.
     for source in light_sources:
-      new_l = LightSource(source[0], source[1], entities, self)
+      new_l = LightSource(source[0], source[1], entities, self, LightSource.RADIAL)
       light_deltas = new_l.calculate_light_deltas(entities, self)
       for i, elem in enumerate(light_deltas):
         for j, delta in enumerate(elem):
@@ -522,7 +525,7 @@ class Bar(Entity):
 class Reflector(Entity):
   def __init__(self, x, y, type):
     self.direction = [1, 0]
-    super(Reflector, self).__init__(x, y, ["renderable", "reflector"], 6, 0, "tiles.png")
+    super(Reflector, self).__init__(x, y, ["renderable", "reflector", "relative"], 6, 0, "tiles.png")
 
   def reflect(self, direction):
     return [direction[1], -direction[0]]
@@ -567,15 +570,16 @@ class Enemy(Entity):
       self.direction[1] *= -1
 
 class LightSource(Entity):
-  TYPE_BEAM = 0
-  TYPE_RADIAL = 1
+  BEAM = 0
+  RADIAL = 1
 
-  def __init__(self, x, y, entities, m, dir=None):
+  def __init__(self, x, y, entities, m, light_type, dir=None):
     if dir is None:
       self.direction = (1, 0)
     else:
       self.direction = dir
 
+    self.light_type = light_type
     self.intensity = -255
     self.falloff = 60
 
@@ -585,6 +589,40 @@ class LightSource(Entity):
     assert(self.y % TILE_SIZE == 0)
 
   def calculate_light_deltas(self, entities, m):
+    if self.light_type == LightSource.BEAM:
+      return self.beam_deltas(entities, m)
+    elif self.light_type == LightSource.RADIAL:
+      return self.radial_deltas(entities, m)
+
+  def radial_deltas(self, entities, m):
+    radius = 500
+    pts = []
+    deltas = [[0 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
+
+    for x in range(self.x - radius, self.x + radius + 1, TILE_SIZE):
+      for y in range(self.y - radius, self.y + radius + 1, TILE_SIZE):
+        if x == self.x - radius or x == self.x + radius or y == self.y - radius or y == self.y + radius:
+          pts.append((x, y))
+
+    print pts
+
+    for x, y in pts:
+      pt = [self.x, self.y]
+
+      #raycast to (x, y) and light up everything along the way.
+      dx = (x - self.x) / radius
+      dy = (y - self.y) / radius
+
+      for i in range(radius):
+        if not m.in_bounds((pt[0], pt[1])): break
+        if m.is_wall_rel(int(pt[0] / 20), int(pt[1] / 20)): break
+        deltas[int(pt[0] / 20)][int(pt[1] / 20)] = self.intensity * (1 - (i + 20) / (radius + 20))
+        pt[0] = pt[0] + dx
+        pt[1] = pt[1] + dy
+
+    return deltas
+
+  def beam_deltas(self, entities, m):
     deltas = [[0 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
 
     pos_abs = [self.x, self.y]
