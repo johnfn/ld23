@@ -254,6 +254,11 @@ class UpKeys:
       return True
     return False
 
+def sign(a):
+  if a > 0: return 1
+  if a < 0: return -1
+  return 0
+
 class Character(Entity):
   def __init__(self, x, y):
     super(Character, self).__init__(x, y, ["renderable", "updateable", "character", "relative"], 0, 1, "tiles.bmp")
@@ -275,12 +280,12 @@ class Character(Entity):
     dest_y = self.y + dy
 
     self.x += dx
-    if self.collides_with_wall(entities):
-      self.x -= dx
+    while self.collides_with_wall(entities):
+      self.x -= sign(dx)
 
     self.y += dy
-    if self.collides_with_wall(entities):
-      self.y -= dy
+    while self.collides_with_wall(entities):
+      self.y -= sign(dy)
 
 def render_all(manager):
   ch = manager.one("character")
