@@ -4,6 +4,7 @@ WIDTH = HEIGHT = 300
 TILE_SIZE = 20
 VISIBLE_MAP_SIZE = 10
 CHAR_XY = WIDTH / 2
+GRAVITY = 3
 
 DEBUG = True
 
@@ -49,6 +50,18 @@ class TileSheet:
       TileSheet.add(sheet)
     return TileSheet.sheets[sheet][x][y]
 
+#TODO: Entity should extend Rect.
+
+class Rect(object):
+  def __init__(self, x, y, s):
+    self.x = x
+    self.y = y
+    self.size = s
+
+  def touches_point(self, point):
+    return self.x <= point.x <= self.x + self.size and\
+           self.y <= point.y <= self.y + self.size
+
 class Entity(object):
   def __init__(self, x, y, groups, src_x = -1, src_y = -1, src_file = ""):
     self.x = x
@@ -63,6 +76,9 @@ class Entity(object):
     self.events = {}
     self.groups = groups
 
+  def nicer_rect(self):
+    return Rect(self.x, self.y , self.size)
+
   def touches_point(self, point):
     return self.x <= point.x <= self.x + self.size and\
            self.y <= point.y <= self.y + self.size
@@ -70,15 +86,10 @@ class Entity(object):
   def touches_rect(self, other):
     if hasattr(self, 'uid') and hasattr(other, 'uid') and self.uid == other.uid: return False
 
-    corners = [ Point(self.x, self.y)\
-              , Point(self.x + self.size, self.y)\
-              , Point(self.x, self.y + self.size)\
-              , Point(self.x + self.size, self.y + self.size)]
-
-    for p in corners:
-      if other.touches_point(p):
-        return True
-    return False
+    return self.x < other.x + other.size and \
+           self.x + self.size > other.x and \
+           self.y < other.y + other.size and \
+           self.y + self.size > other.y
 
   def add_group(self, group):
     self.groups.append(group)
@@ -206,7 +217,7 @@ class Map(Entity):
             [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
             ]
 
     self.tiles = []
@@ -263,9 +274,11 @@ class Character(Entity):
   def __init__(self, x, y):
     super(Character, self).__init__(x, y, ["renderable", "updateable", "character", "relative"], 0, 1, "tiles.bmp")
     self.speed = 5
+    self.vy = 0
 
   def collides_with_wall(self, entities):
-    return entities.any("wall", lambda x: x.touches_rect(self))
+    nr = self.nicer_rect()
+    return entities.any("wall", lambda x: x.touches_rect(nr))
 
   def update(self, entities):
     dx, dy = (0, 0)
@@ -274,6 +287,10 @@ class Character(Entity):
     if UpKeys.key_down(pygame.K_UP): dy -= self.speed
     if UpKeys.key_down(pygame.K_LEFT): dx -= self.speed
     if UpKeys.key_down(pygame.K_RIGHT): dx += self.speed
+
+    self.vy -= GRAVITY
+    dy -= self.vy
+    dy = min(dy, 5)
 
     delta = .1
     dest_x = self.x + dx
@@ -284,8 +301,13 @@ class Character(Entity):
       self.x -= sign(dx)
 
     self.y += dy
+    ground = False
     while self.collides_with_wall(entities):
+      ground = True
       self.y -= sign(dy)
+
+    if ground:
+      dy = 0
 
 def render_all(manager):
   ch = manager.one("character")
