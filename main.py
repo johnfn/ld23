@@ -21,6 +21,7 @@ JIGGLE_LENGTH = 50
 #gameplay
 
 MAX_HEALTH_INC = 3
+INSANE_LIGHT = 150
 
 #depths
 
@@ -320,6 +321,7 @@ class Map(Entity):
     self.mapx = 0
     self.mapy = 0
     self.visible_map_size = VISIBLE_MAP_SIZE
+    self.light_deltas = None
 
     super(Map, self).__init__(0, 0, ["updateable", "map"])
 
@@ -377,6 +379,9 @@ class Map(Entity):
   def is_wall_rel(self, i, j):
     return "wall" in self.tiles[i][j].groups
 
+  def get_lighting_rel(self, i, j):
+    return self.light_deltas[i][j]
+
   def calculate_lighting(self, light_sources, entities):
     # everything starts dark.
     dark_values = [[255 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
@@ -401,6 +406,8 @@ class Map(Entity):
     """
 
     entities.add(Light(dark_values))
+    self.light_deltas = dark_values
+
 
 class UpKeys:
   """ Simple abstraction to check for recent key released behavior. """
@@ -516,11 +523,11 @@ class Bar(Entity):
     # Inside
     actual_w = self.width - self.border_width * 2
     actual_h = self.height - self.border_width * 2
-    pygame.draw.rect(screen, (255, 0, 0), (self.x + self.border_width + dx, self.y + self.border_width + dy, actual_w, actual_h))
+    pygame.draw.rect(screen, self.color_no_health, (self.x + self.border_width + dx, self.y + self.border_width + dy, actual_w, actual_h))
 
     # 'Health'
     health_w = (self.amt / self.max_amt) * actual_w
-    pygame.draw.rect(screen, (0, 255, 0), (self.x + self.border_width + dx, self.y + self.border_width + dy, health_w, actual_h))
+    pygame.draw.rect(screen, self.color_health, (self.x + self.border_width + dx, self.y + self.border_width + dy, health_w, actual_h))
 
 class Reflector(Entity):
   def __init__(self, x, y, type):
@@ -604,8 +611,6 @@ class LightSource(Entity):
         if x == self.x - radius or x == self.x + radius or y == self.y - radius or y == self.y + radius:
           pts.append((x, y))
 
-    print pts
-
     for x, y in pts:
       pt = [self.x, self.y]
 
@@ -648,8 +653,6 @@ class LightSource(Entity):
 
       if len(reflectors) > 0:
         cur_dir = reflectors[0].reflect(cur_dir)
-
-        print cur_dir
 
       pos_abs[0] += cur_dir[0] * TILE_SIZE
       pos_abs[1] += cur_dir[1] * TILE_SIZE
@@ -713,6 +716,14 @@ class Character(Entity):
 
     self.hp_bar = Bar(self, (0, 255, 0), (255, 0, 0), self.hp, self.max_hp)
     entities.add(self.hp_bar)
+    self.hp_bar.visible = False
+
+    self.sanity = 10
+    self.max_sanity = 10
+
+    self.sanity_bar = Bar(self, (255, 255, 255), (0, 0, 0), self.sanity, self.max_sanity)
+    entities.add(self.sanity_bar)
+    self.sanity_bar.visible = False
 
   def die(self):
     print "you die!!!!!!!!!!!!!!"
@@ -805,6 +816,31 @@ class Character(Entity):
       self.vy = 0
 
     self.check_new_map(entities)
+    self.check_sanity(entities.one("map"))
+
+  def soft_death(self):
+    print "soft death!"
+
+  def check_sanity(self, m):
+    if self.sanity < 0: self.sanity = 0
+    if self.sanity > self.max_sanity: self.sanity = self.max_sanity
+
+    self.sanity_bar.set_amt(self.sanity)
+
+    if self.sanity < self.max_sanity:
+      self.sanity_bar.visible = True
+    else:
+      self.sanity_bar.visible = False
+
+    if not m.get_lighting_rel(int(self.x/20), int(self.y/20)) > INSANE_LIGHT: 
+      if self.sanity < self.max_sanity:
+        if Tick.get(6): self.sanity += 1
+      return
+
+    if Tick.get(10): self.sanity -= 1
+
+    if self.sanity <= 0:
+      self.soft_death()
 
 def render_all(manager):
   ch = manager.one("character")
