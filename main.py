@@ -1,6 +1,7 @@
 from __future__ import division
 import sys, pygame, spritesheet, wordwrap
 import random
+import numpy
 from wordwrap import render_textrect
 
 WIDTH = HEIGHT = 300
@@ -10,6 +11,7 @@ CHAR_XY = WIDTH / 2
 GRAVITY = 2
 MAP_SIZE_TILES = 20
 MAP_SIZE_PIXELS = MAP_SIZE_TILES * TILE_SIZE
+NOT_DARK = 0
 
 #aesthestics
 
@@ -34,6 +36,12 @@ def get_uid():
   get_uid.uid += 1
   return get_uid.uid
 get_uid.uid = 0
+
+def darken(surface, value):
+    "Value is 0 to 255. So 128 would be 50% darken"
+    dark = pygame.Surface(surface.get_size(), 32)
+    dark.set_alpha(value, pygame.RLEACCEL)
+    surface.blit(dark, (0, 0))
 
 class Tick:
   tick = 0
@@ -91,6 +99,7 @@ class Entity(object):
       self.img = TileSheet.get(src_file, src_x, src_y)
       self.rect = self.img.get_rect()
 
+    self.darkness = 0
     self.uid = get_uid()
     self.events = {}
     self.groups = groups
@@ -99,6 +108,11 @@ class Entity(object):
     self.jiggling = 0
     self.old_xy = ()
     self.flashing = 0
+
+  def set_darkness(self, amt):
+    self.darkness = amt
+
+    if self.darkness != 0: self.make_dark_img()
 
   def jiggle(self):
     self.jiggling = JIGGLE_LENGTH
@@ -166,7 +180,15 @@ class Entity(object):
 
     self.rect.x = self.x + dx
     self.rect.y = self.y + dy
-    screen.blit(self.img, self.rect)
+
+    if self.darkness == NOT_DARK:
+      screen.blit(self.img, self.rect)
+    else:
+      screen.blit(self.darkimg, self.rect)
+
+  def make_dark_img(self):
+    self.darkimg = self.img.copy()
+    darken(self.darkimg, self.darkness)
 
   def update(self, entities):
     if self.jiggling > 0:
@@ -273,6 +295,8 @@ class Map(Entity):
               , (0, 0, 255): 3 #light source
               }
 
+    self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
+
     light_sources = []
     for i in range(MAP_SIZE_TILES):
       for j in range(MAP_SIZE_TILES):
@@ -292,10 +316,30 @@ class Map(Entity):
 
         tile.add_group("map_element")
         entities.add(tile)
+        self.tiles[i][j] = tile
+
+    self.calculate_lighting(light_sources, entities)
+
+  def calculate_lighting(self, light_sources, entities):
+    # everything starts dark.
+    self.dark_values = [[255 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
 
     # Sources need to be aware of the entire map, so we add them last.
     for source in light_sources:
-      entities.add(LightSource(source[0], source[1], entities, self))
+      new_l = LightSource(source[0], source[1], entities, self)
+      light_deltas = new_l.calculate_light_deltas(entities, self)
+      for i, elem in enumerate(light_deltas):
+        for j, delta in enumerate(elem):
+          self.dark_values[i][j] += delta
+
+          if self.dark_values[i][j] > 255: self.dark_values[i][j] = 255
+          if self.dark_values[i][j] < 0: self.dark_values[i][j] = 0
+
+      entities.add(new_l)
+
+    for i in range(MAP_SIZE_TILES):
+      for j in range(MAP_SIZE_TILES):
+        self.tiles[i][j].set_darkness(self.dark_values[i][j])
 
 class UpKeys:
   """ Simple abstraction to check for recent key released behavior. """
@@ -472,19 +516,25 @@ class LightSource(Entity):
     else:
       self.direction = dir
 
-    super(LightSource, self).__init__(x, y, ["renderable", "updateable", "map_element", "lightsource"], 5, 0, "tiles.png")
+    self.intensity = -255
+    super(LightSource, self).__init__(x, y, ["renderable", "relative", "updateable", "map_element", "lightsource"], 5, 0, "tiles.png")
 
-    self.create_light(entities, m)
+  def calculate_light_deltas(self, entities, m):
+    deltas = [[0 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
 
-  def create_light(self, entities, m):
     pos = [self.x, self.y]
     cur_dir = self.direction
 
     while m.in_bounds(pos) and not entities.any("wall", lambda e: e.x == pos[0] and e.y == pos[1]):
+      # bugginess of this line approaches 1...
+      deltas[int(pos[0] / TILE_SIZE)][int(pos[1] / TILE_SIZE)] = self.intensity
+
       new_spot = LightSpot(pos[0], pos[1], entities)
       entities.add(new_spot)
       pos[0] += cur_dir[0] * TILE_SIZE
       pos[1] += cur_dir[1] * TILE_SIZE
+
+    return deltas
 
   def depth(self):
     return LIGHT_SOURCE_DEPTH
