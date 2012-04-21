@@ -22,6 +22,16 @@ def get_uid():
   return get_uid.uid
 get_uid.uid = 0
 
+class Tick:
+  tick = 0
+
+  @staticmethod
+  def inc():
+    Tick.tick += 1
+
+  @staticmethod
+  def get(prob=1):
+    return (Tick.tick % prob == 0)
 
 class Point:
   def __init__(self, x, y):
@@ -284,22 +294,31 @@ class Text(Entity):
     super(Text, self).__init__(follow.x, follow.y, ["renderable", "text", "updateable"])
     self.contents = contents
     self.follow = follow
+    self.shown_chars = 1
+    self.tot_chars = len(contents)
 
   def depth(self):
     return TEXT_DEPTH
 
   def update(self, entities):
     if UpKeys.key_up(pygame.K_z):
-      entities.remove(self)
+      if self.shown_chars == self.tot_chars:
+        entities.remove(self)
+      else:
+        self.shown_chars = self.tot_chars
+
+    if Tick.get(3) and self.shown_chars < self.tot_chars:
+      self.shown_chars += 1
 
   def render(self, screen, dx, dy):
     my_width = 100
     my_font = pygame.font.Font("nokiafc22.ttf", 12)
+    vis_text = self.contents[:self.shown_chars]
 
-    my_rect = pygame.Rect((self.follow.x + dx - my_width / 2, self.follow.y + dy - len(self.contents) - 30, my_width, 70))
+    my_rect = pygame.Rect((self.follow.x + dx - my_width / 2, self.follow.y + dy - len(vis_text) - 30, my_width, 70))
     if my_rect.x < 0:
       my_rect.x = 0
-    rendered_text = render_textrect(self.contents, my_font, my_rect, (10, 10, 10), (255, 255, 255), False, 1)
+    rendered_text = render_textrect(vis_text, my_font, my_rect, (10, 10, 10), (255, 255, 255), False, 1)
 
     screen.blit(rendered_text, my_rect.topleft)
 
@@ -393,6 +412,8 @@ def main():
     pygame.mixer.music.play(-1) #Infinite loop! HAHAH!
 
   while True:
+    Tick.inc()
+
     for event in pygame.event.get():
       UpKeys.flush()
       if event.type == pygame.QUIT:
