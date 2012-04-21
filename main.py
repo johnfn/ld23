@@ -2,6 +2,7 @@ from __future__ import division
 import sys, pygame, spritesheet, wordwrap
 import random
 import numpy
+import math
 from wordwrap import render_textrect
 
 WIDTH = HEIGHT = 300
@@ -501,14 +502,6 @@ class Enemy(Entity):
       self.direction[0] *= -1
       self.direction[1] *= -1
 
-class LightSpot(Entity):
-  def __init__(self, x, y, intensity):
-    self.x = x
-    self.y = y
-    self.intensity = intensity
-
-    super(LightSpot, self).__init__(x, y, ["renderable", "updateable", "lightspot", "map_element", "relative"], 5, 0, "tiles.png")
-
 class LightSource(Entity):
   def __init__(self, x, y, entities, m, dir=None):
     if dir is None:
@@ -517,22 +510,41 @@ class LightSource(Entity):
       self.direction = dir
 
     self.intensity = -255
+    self.falloff = 60
+
     super(LightSource, self).__init__(x, y, ["renderable", "relative", "updateable", "map_element", "lightsource"], 5, 0, "tiles.png")
+
+    assert(self.x % TILE_SIZE == 0)
+    assert(self.y % TILE_SIZE == 0)
 
   def calculate_light_deltas(self, entities, m):
     deltas = [[0 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
 
-    pos = [self.x, self.y]
+    pos_abs = [self.x, self.y]
+    pos_rel = [int(self.x / TILE_SIZE), int(self.y / TILE_SIZE)]
     cur_dir = self.direction
 
-    while m.in_bounds(pos) and not entities.any("wall", lambda e: e.x == pos[0] and e.y == pos[1]):
+    while m.in_bounds(pos_abs) and not entities.any("wall", lambda e: e.x == pos_abs[0] and e.y == pos_abs[1]):
       # bugginess of this line approaches 1...
-      deltas[int(pos[0] / TILE_SIZE)][int(pos[1] / TILE_SIZE)] = self.intensity
+      deltas[pos_rel[0]][pos_rel[1]] = self.intensity
 
-      new_spot = LightSpot(pos[0], pos[1], entities)
-      entities.add(new_spot)
-      pos[0] += cur_dir[0] * TILE_SIZE
-      pos[1] += cur_dir[1] * TILE_SIZE
+      # radial lighting
+      radius = int(math.ceil(- self.intensity / self.falloff))
+
+      for x in range(pos_rel[0] - radius, pos_rel[0] + radius + 1):
+        for y in range(pos_rel[1] - radius, pos_rel[1] + radius + 1):
+          if m.in_bounds((x * TILE_SIZE, y * TILE_SIZE)):
+            point_intensity = -max(0, 255 - (abs(x - pos_rel[0]) + abs(y - pos_rel[1])) * self.falloff)
+            print point_intensity
+            deltas[x][y] += point_intensity
+
+      if cur_dir[0] == 0 and cur_dir[1] == 0: break
+
+      pos_abs[0] += cur_dir[0] * TILE_SIZE
+      pos_abs[1] += cur_dir[1] * TILE_SIZE
+
+      pos_rel[0] += cur_dir[0]
+      pos_rel[1] += cur_dir[1]
 
     return deltas
 
