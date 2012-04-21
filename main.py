@@ -201,7 +201,7 @@ def tupleize(color):
 
 class Map(Entity):
   def __init__(self):
-    self.full_map_size = 20
+    self.full_map_size = MAP_SIZE_TILES
     self.mapx = 0
     self.mapy = 0
     self.visible_map_size = VISIBLE_MAP_SIZE
@@ -213,6 +213,9 @@ class Map(Entity):
 
   def new_map_rel(self, entities, dx, dy):
     self.new_map_abs(entities, self.mapx + dx, self.mapy + dy)
+
+  def in_bounds(self, point):
+    return point[0] >= 0 and point[1] >= 0 and point[0] <= MAP_SIZE_PIXELS and point[1] <= MAP_SIZE_PIXELS
 
   def new_map_abs(self, entities, x, y):
     self.mapx = x
@@ -328,11 +331,17 @@ class Bullet(Entity):
     self.x += self.direction[0] * self.speed
     self.y += self.direction[1] * self.speed
 
+    if not entities.one("map").in_bounds((self.x, self.y)):
+      entities.remove(self)
+      print "off"
+      return
+
     hitlambda = lambda x: x.touches_point((self.x + self.size/2, self.y + self.size/2))
 
     walls_hit = entities.get("wall", hitlambda)
-
-    if len(walls_hit) > 0: entities.remove(self)
+    if len(walls_hit) > 0:
+      entities.remove(self)
+      return
 
 class Character(Entity):
   def __init__(self, x, y):
