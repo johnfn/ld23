@@ -208,10 +208,17 @@ class Particles(Entity):
   def __init__(self, entities, particle_sources):
     self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
 
-    super(Particles, self).__init__(0, 0, ["renderable", "updateable", "relative"])
+    super(Particles, self).__init__(0, 0, ["renderable", "updateable", "relative", "particles"])
     self.particles = []
+    self.beams = []
     self.particle_sources = particle_sources
     self.tick = 0
+
+    for source in self.particle_sources:
+      if "beamlight" in source.groups:
+        for beam_pos in source.light_beam_pos():
+          print beam_pos
+          self.beams.append(LightBeam(beam_pos[0], beam_pos[1]))
 
   def update(self, entities):
     self.tick += 1
@@ -219,7 +226,7 @@ class Particles(Entity):
 
     for source in self.particle_sources:
       if random.random() > .8:
-        p = Particle(source[0], source[1])
+        p = Particle(source.x, source.y)
         self.particles.append(p)
         entities.add(p)
 
@@ -231,6 +238,9 @@ class Particles(Entity):
     for p in self.particles:
       p.update()
       p.render(self.surf)
+
+    for beam in self.beams:
+      beam.render(self.surf)
 
     self.surf = blur_surf(self.surf, 5.0)
 
@@ -269,6 +279,10 @@ class Particle(Entity):
 
   def render(self, screen):
     screen.blit(self.trans_img, (self.x, self.y))
+
+class LightBeam(Entity):
+  def __init__(self, x, y):
+    super(LightBeam, self).__init__(x, y, [], 8, 0, "tiles.png")
 
 class LightSpot(Entity):
   def __init__(self, x, y, intensity):
@@ -412,8 +426,8 @@ class Map(Entity):
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
 
-    light_sources = []
     particle_sources = []
+    light_sources = []
 
     for i in range(MAP_SIZE_TILES):
       for j in range(MAP_SIZE_TILES):
@@ -429,8 +443,8 @@ class Map(Entity):
           entities.add(Enemy(i * TILE_SIZE, j * TILE_SIZE, Enemy.STRATEGY_STUPID))
         elif colors == 3:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
-          light_sources.append([i * TILE_SIZE, j * TILE_SIZE])
           particle_sources.append([i * TILE_SIZE, j * TILE_SIZE])
+          light_sources.append([i * TILE_SIZE, j * TILE_SIZE])
         elif colors == 4:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           entities.add(Reflector(i * TILE_SIZE, j * TILE_SIZE, None))
@@ -440,7 +454,6 @@ class Map(Entity):
         self.tiles[i][j] = tile
 
     self.calculate_lighting(light_sources, entities)
-    entities.add(Particles(entities, particle_sources))
 
   def is_wall_rel(self, i, j):
     return "wall" in self.tiles[i][j].groups
@@ -451,10 +464,12 @@ class Map(Entity):
   def calculate_lighting(self, light_sources, entities):
     # everything starts dark.
     dark_values = [[255 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
+    light_objs = []
 
     # Sources need to be aware of the entire map, so we add them last.
     for source in light_sources:
-      new_l = LightSource(source[0], source[1], entities, self, LightSource.RADIAL)
+      #TODO: Ther eis no differentiation between BEAM and RADIAL at this point.
+      new_l = LightSource(source[0], source[1], entities, self, LightSource.BEAM)
       light_deltas = new_l.calculate_light_deltas(entities, self)
       for i, elem in enumerate(light_deltas):
         for j, delta in enumerate(elem):
@@ -463,14 +478,10 @@ class Map(Entity):
           if dark_values[i][j] > 255: dark_values[i][j] = 255
           if dark_values[i][j] < 0: dark_values[i][j] = 0
 
+      light_objs.append(new_l)
       entities.add(new_l)
 
-    """
-    for i in range(MAP_SIZE_TILES):
-      for j in range(MAP_SIZE_TILES):
-        self.tiles[i][j].set_darkness(self.dark_values[i][j])
-    """
-
+    entities.add(Particles(entities, light_objs))
     entities.add(Light(dark_values))
     self.light_deltas = dark_values
 
@@ -655,8 +666,12 @@ class LightSource(Entity):
     self.light_type = light_type
     self.intensity = -255
     self.falloff = 60
+    self.lightbeampos = []
 
     super(LightSource, self).__init__(x, y, ["renderable", "relative", "updateable", "map_element", "lightsource"], 5, 0, "tiles.png")
+
+    if light_type == LightSource.BEAM:
+      self.groups.append("beamlight")
 
     assert(self.x % TILE_SIZE == 0)
     assert(self.y % TILE_SIZE == 0)
@@ -693,7 +708,11 @@ class LightSource(Entity):
 
     return deltas
 
+  def light_beam_pos(self):
+    return self.lightbeampos
+
   def beam_deltas(self, entities, m):
+    self.lightbeampos = []
     deltas = [[0 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
 
     pos_abs = [self.x, self.y]
@@ -703,6 +722,7 @@ class LightSource(Entity):
     while m.in_bounds(pos_abs) and not entities.any("wall", lambda e: e.x == pos_abs[0] and e.y == pos_abs[1]):
       # bugginess of this line approaches 1...
       deltas[pos_rel[0]][pos_rel[1]] = self.intensity
+      self.lightbeampos.append((pos_abs[0], pos_abs[1]))
 
       # radial lighting
       radius = int(math.ceil(- self.intensity / self.falloff))
