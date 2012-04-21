@@ -297,22 +297,23 @@ class Light(Entity):
 
     self.light_objs = light_objs
     self.dark_values = dark_values
-    self.beams = []
-    self.spots = [[None for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
-    for x in range(MAP_SIZE_TILES):
-      for y in range(MAP_SIZE_TILES):
-        self.spots[x][y] = LightSpot(x * TILE_SIZE, y * TILE_SIZE, dark_values[x][y])
 
-    self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
+    self.recalculate_light()
 
-    self.build_light()
-
-    super(Light, self).__init__(x, y, ["renderable", "relative"], 5, 0, "tiles.png")
+    super(Light, self).__init__(0, 0, ["renderable", "relative", "all-lights"], 5, 0, "tiles.png")
 
   def depth(self):
     return LIGHT_DEPTH
 
-  def build_light(self):
+  def recalculate_light(self):
+    self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
+
+    # calculate ambient light of each (x,y) position.
+    self.spots = [[None for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
+    for x in range(MAP_SIZE_TILES):
+      for y in range(MAP_SIZE_TILES):
+        self.spots[x][y] = LightSpot(x * TILE_SIZE, y * TILE_SIZE, self.dark_values[x][y])
+
     # build an array of every beam object created by every light.
     self.beams = []
 
@@ -679,13 +680,27 @@ class LightSource(Entity):
     self.falloff = 60
     self.lightbeampos = []
 
-    super(LightSource, self).__init__(x, y, ["renderable", "relative", "updateable", "map_element", "lightsource"], 5, 0, "tiles.png")
+    super(LightSource, self).__init__(x, y, ["wall", "renderable", "relative", "updateable", "map_element", "lightsource"], 5, 0, "tiles.png")
 
     if light_type == LightSource.BEAM:
       self.groups.append("beamlight")
+      self.groups.append("pushable")
 
     assert(self.x % TILE_SIZE == 0)
     assert(self.y % TILE_SIZE == 0)
+
+  def push(self, direction, entities):
+    new_x = self.x + direction[0] * TILE_SIZE
+    new_y = self.y + direction[1] * TILE_SIZE
+
+    if entities.any("wall", lambda e: e.x == new_x and e.y == new_y): return
+    self.move(new_x, new_y, entities)
+
+  def move(self, x, y, entities):
+    self.x = x
+    self.y = y
+
+    entities.one("all-lights").recalculate_light()
 
   def calculate_light_deltas(self, entities, m):
     if self.light_type == LightSource.BEAM:
@@ -730,7 +745,7 @@ class LightSource(Entity):
     pos_rel = [int(self.x / TILE_SIZE), int(self.y / TILE_SIZE)]
     cur_dir = self.direction
 
-    while m.in_bounds(pos_abs) and not entities.any("wall", lambda e: e.x == pos_abs[0] and e.y == pos_abs[1]):
+    while m.in_bounds(pos_abs) and not entities.any("wall", lambda e: e.x == pos_abs[0] and e.y == pos_abs[1] and e.uid != self.uid):
       # bugginess of this line approaches 1...
       deltas[pos_rel[0]][pos_rel[1]] = self.intensity
       self.lightbeampos.append((pos_abs[0], pos_abs[1]))
@@ -869,6 +884,12 @@ class Character(Entity):
     b = Bullet(self, self.direction, 1)
     entities.add(b)
 
+  def check_for_push(self, entities):
+    pushblock = entities.get("pushable", lambda x: x.touches_rect(self))
+    if len(pushblock) == 0: return
+
+    pushblock[0].push(self.direction, entities)
+
   def update(self, entities):
     super(Character, self).update(entities)
 
@@ -894,6 +915,7 @@ class Character(Entity):
     dest_y = self.y + dy
 
     self.x += dx
+    self.check_for_push(entities)
     while self.collides_with_wall(entities):
       self.x -= sign(dx) or -1
 
