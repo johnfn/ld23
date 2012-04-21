@@ -83,6 +83,10 @@ class Entity(object):
     self.events = {}
     self.groups = groups
 
+  def collides_with_wall(self, entities):
+    nr = self.nicer_rect()
+    return entities.any("wall", lambda x: x.touches_rect(nr))
+
   def nicer_rect(self):
     return Rect(self.x, self.y , self.size)
 
@@ -226,6 +230,7 @@ class Map(Entity):
 
     mapping = { (0, 0, 0): 1
               , (255, 255, 255): 0
+              , (255, 0, 19): 2
               }
 
     for i in range(MAP_SIZE_TILES):
@@ -237,6 +242,10 @@ class Map(Entity):
         elif colors == 1:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 1, 0)
           tile.add_group("wall")
+        elif colors == 2:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+
+          entities.add(Enemy(i * TILE_SIZE, j * TILE_SIZE))
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -315,6 +324,28 @@ class Text(Entity):
 
     screen.blit(rendered_text, my_rect.topleft)
 
+class Enemy(Entity):
+  STRATEGY_STUPID = 0
+
+  def __init__(self, x, y):
+    self.speed = 3
+    self.type = Enemy.STRATEGY_STUPID
+
+    self.direction = [1, 0]
+    super(Enemy, self).__init__(x, y, ["renderable", "updateable", "enemy", "relative", "map_element"], 4, 0, "tiles.png")
+
+  def update(self, entities):
+    if self.type == Enemy.STRATEGY_STUPID:
+      self.be_stupid(entities)
+
+  def be_stupid(self, entities):
+    self.x += self.direction[0]
+    self.y += self.direction[1]
+
+    if self.collides_with_wall(entities):
+      self.direction[0] *= -1
+      self.direction[1] *= -1
+
 class Bullet(Entity):
   def __init__(self, owner, direction):
     self.speed = 6
@@ -322,7 +353,7 @@ class Bullet(Entity):
 
     self.direction = direction
     self.owner = owner
-    super(Bullet, self).__init__(owner.x, owner.y, ["renderable", "updateable", "bullet", "relative"], 3, 0, "tiles.png")
+    super(Bullet, self).__init__(owner.x, owner.y, ["renderable", "updateable", "bullet", "relative", "map_element"], 3, 0, "tiles.png")
 
   def depth(self):
     return BULLET_DEPTH
@@ -351,10 +382,6 @@ class Character(Entity):
     self.onground = False
     self.cooldown = 5
     self.direction = (1, 0)
-
-  def collides_with_wall(self, entities):
-    nr = self.nicer_rect()
-    return entities.any("wall", lambda x: x.touches_rect(nr))
 
   def check_new_map(self, entities):
     m = entities.one("map")
