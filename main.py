@@ -1,5 +1,6 @@
 from __future__ import division
 import sys, pygame, spritesheet, wordwrap
+import random
 from wordwrap import render_textrect
 
 WIDTH = HEIGHT = 300
@@ -9,6 +10,14 @@ CHAR_XY = WIDTH / 2
 GRAVITY = 2
 MAP_SIZE_TILES = 20
 MAP_SIZE_PIXELS = MAP_SIZE_TILES * TILE_SIZE
+
+#aesthestics
+
+JIGGLE_LENGTH = 50
+
+#gameplay
+
+MAX_HEALTH_INC = 3
 
 #depths
 
@@ -84,6 +93,15 @@ class Entity(object):
     self.uid = get_uid()
     self.events = {}
     self.groups = groups
+    self.visible = True
+
+    self.jiggling = 0
+    self.old_xy = ()
+    self.flashing = 0
+
+  def jiggle(self):
+    self.jiggling = JIGGLE_LENGTH
+    self.old_xy = (self.x, self.y)
 
   def collides_with_wall(self, entities):
     nr = self.nicer_rect()
@@ -130,24 +148,42 @@ class Entity(object):
   def depth(self):
     return 0
 
-  # Methods that must be implemented if you extend Entity
   def groups(self):
     return groups
 
+  def is_jiggling(self):
+    return self.jiggling > 0
+
+  def is_flashing(self):
+    return self.flashing > 0
+
+  def flash(self):
+    self.flashing = 30
+
   def render(self, screen, dx=0, dy=0):
+    if not self.visible: return
+
     self.rect.x = self.x + dx
     self.rect.y = self.y + dy
     screen.blit(self.img, self.rect)
 
   def update(self, entities):
-    raise "UnimplementedUpdateException"
+    if self.jiggling > 0:
+      self.x = self.x + random.randrange(-5, 5)
+      self.y = self.y + random.randrange(-5, 5)
+      self.jiggling -= 1
+
+    if self.flashing > 0:
+      #TODO
+
+      self.flashing -= 1
 
 class Tile(Entity):
   def __init__(self, x, y, tx, ty):
     super(Tile, self).__init__(x, y, ["renderable", "updateable", "relative"], tx, ty, "tiles.png")
 
   def update(self, entities):
-    pass
+    super(Tile, self).update(entities)
 
 def isalambda(v):
   return isinstance(v, type(lambda: None)) and v.__name__ == '<lambda>'
@@ -215,7 +251,7 @@ class Map(Entity):
     super(Map, self).__init__(0, 0, ["updateable", "map"])
 
   def update(self, entities):
-    pass
+    super(Map, self).update(entities)
 
   def new_map_rel(self, entities, dx, dy):
     self.new_map_abs(entities, self.mapx + dx, self.mapy + dy)
@@ -305,6 +341,7 @@ class Text(Entity):
     return TEXT_DEPTH
 
   def update(self, entities):
+    super(Text, self).update(entities)
     if UpKeys.key_up(pygame.K_z):
       if self.shown_chars == self.tot_chars:
         entities.remove(self)
@@ -315,6 +352,8 @@ class Text(Entity):
       self.shown_chars += 1
 
   def render(self, screen, dx, dy):
+    if not self.visible: return
+
     my_width = 100
     my_font = pygame.font.Font("nokiafc22.ttf", 12)
     vis_text = self.contents[:self.shown_chars]
@@ -328,11 +367,12 @@ class Text(Entity):
 
 class Bar(Entity):
   def __init__(self, follow, color_health, color_no_health, amt, max_amt):
-    super(Bar, self).__init__(follow.x, follow.y, ["renderable", "healthbar", "relative"])
+    super(Bar, self).__init__(follow.x, follow.y, ["renderable", "updateable", "healthbar", "relative"])
     self.amt = amt
     self.max_amt = max_amt
     self.color_health = color_health
     self.color_no_health = color_no_health
+    self.follow = follow
 
     self.width = 40
     self.height = 8
@@ -347,21 +387,26 @@ class Bar(Entity):
   def depth(self):
     return BAR_DEPTH
 
+  def update(self, entities):
+    self.x = self.follow.x
+    self.y = self.follow.y
+
+    super(Bar, self).update(entities)
+
   def render(self, screen, dx, dy):
-    self.x = 50
-    self.y = 50
+    if not self.visible: return
 
     # Outer border
-    pygame.draw.rect(screen, (0, 0, 0), (50, 50, self.width, self.height))
+    pygame.draw.rect(screen, (0, 0, 0), (self.x + dx, self.y + dy, self.width, self.height))
 
     # Inside
     actual_w = self.width - self.border_width * 2
     actual_h = self.height - self.border_width * 2
-    pygame.draw.rect(screen, (255, 0, 0), (self.x + self.border_width, self.y + self.border_width, actual_w, actual_h))
+    pygame.draw.rect(screen, (255, 0, 0), (self.x + self.border_width + dx, self.y + self.border_width + dy, actual_w, actual_h))
 
     # 'Health'
     health_w = (self.amt / self.max_amt) * actual_w
-    pygame.draw.rect(screen, (0, 255, 0), (self.x + self.border_width, self.y + self.border_width, health_w, actual_h))
+    pygame.draw.rect(screen, (0, 255, 0), (self.x + self.border_width + dx, self.y + self.border_width + dy, health_w, actual_h))
 
 
 class Enemy(Entity):
@@ -378,8 +423,14 @@ class Enemy(Entity):
     super(Enemy, self).__init__(x, y, ["renderable", "updateable", "enemy", "relative", "map_element"], 4, 0, "tiles.png")
 
   def update(self, entities):
+    super(Enemy, self).update(entities)
+
     if self.type == Enemy.STRATEGY_STUPID:
       self.be_stupid(entities)
+
+    ch = entities.one("character")
+    if self.touches_rect(ch):
+      ch.hurt(1)
 
   def die(self, entities):
     entities.remove(self)
@@ -411,6 +462,8 @@ class Bullet(Entity):
     return BULLET_DEPTH
 
   def update(self, entities):
+    super(Bullet, self).update(entities)
+
     self.x += self.direction[0] * self.speed
     self.y += self.direction[1] * self.speed
 
@@ -433,13 +486,47 @@ class Bullet(Entity):
       return
 
 class Character(Entity):
-  def __init__(self, x, y):
+  def __init__(self, x, y, entities):
     super(Character, self).__init__(x, y, ["renderable", "updateable", "character", "relative"], 0, 1, "tiles.bmp")
     self.speed = 5
     self.vy = 0
     self.onground = False
     self.cooldown = 5
     self.direction = (1, 0)
+
+    self.hp = 5
+    self.max_hp = 5
+
+    self.hp_bar = Bar(self, (0, 255, 0), (255, 0, 0), self.hp, self.max_hp)
+    entities.add(self.hp_bar)
+
+  def die(self):
+    print "you die!!!!!!!!!!!!!!"
+
+  def hurt(self, amt):
+    if self.is_flashing(): return
+
+    self.hp -= amt
+    if self.hp <= 0:
+      self.hp = 0
+      self.die()
+
+    self.hp_bar.set_amt(self.hp)
+    self.hp_bar.jiggle()
+
+    self.flash()
+
+  def extra_max_health(self, amt):
+    self.hp += amt
+    self.max_hp += amt
+    self.hp_bar.width += amt * 2
+
+  def heal(self, amt):
+    self.hp += amt
+    if self.hp > self.max_hp:
+      self.hp = self.max_hp
+
+    self.hp_bar.set_amt(self.hp)
 
   def check_new_map(self, entities):
     m = entities.one("map")
@@ -461,6 +548,8 @@ class Character(Entity):
     entities.add(b)
 
   def update(self, entities):
+    super(Character, self).update(entities)
+
     dx, dy = (0, 0)
 
     if UpKeys.key_down(pygame.K_x) and Tick.get(self.cooldown): self.shoot_bullet(entities)
@@ -516,12 +605,10 @@ def render_all(manager):
 
 def main():
   manager = Entities()
-  c = Character(40, 40)
+  c = Character(40, 40, manager)
   manager.add(c)
   t = Text(c, "This is a realllllllly long text!!!!!!")
   manager.add(t)
-  b = Bar(c, (0, 255, 0), (255, 0, 0), 3, 5)
-  manager.add(b)
 
   m = Map()
   m.new_map_abs(manager, 0, 0)
