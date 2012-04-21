@@ -11,6 +11,7 @@ MAP_SIZE_PIXELS = MAP_SIZE_TILES * TILE_SIZE
 
 #depths
 
+BULLET_DEPTH = 50
 TEXT_DEPTH = 100
 
 DEBUG = True
@@ -322,12 +323,35 @@ class Text(Entity):
 
     screen.blit(rendered_text, my_rect.topleft)
 
+class Bullet(Entity):
+  def __init__(self, owner, direction):
+    self.speed = 6
+    if "character" in owner.groups: self.speed = 10
+
+    self.direction = direction
+    self.owner = owner
+    super(Bullet, self).__init__(owner.x, owner.y, ["renderable", "updateable", "bullet", "relative"], 3, 0, "tiles.png")
+
+  def depth(self):
+    return BULLET_DEPTH
+
+  def update(self, entities):
+    self.x += self.direction[0] * self.speed
+    self.y += self.direction[1] * self.speed
+
+    hit = entities.get(lambda x: x.touches_point(self.x + self.size/2, self.y + self.size/2))
+
+    if len(hit) > 0:
+      entities.remove(self)
+
 class Character(Entity):
   def __init__(self, x, y):
     super(Character, self).__init__(x, y, ["renderable", "updateable", "character", "relative"], 0, 1, "tiles.bmp")
     self.speed = 5
     self.vy = 0
     self.onground = False
+    self.cooldown = 5
+    self.direction = (1, 0)
 
   def collides_with_wall(self, entities):
     nr = self.nicer_rect()
@@ -348,11 +372,22 @@ class Character(Entity):
       self.x -= (MAP_SIZE_PIXELS - TILE_SIZE) * d[0]
       self.y -= (MAP_SIZE_PIXELS - TILE_SIZE) * d[1]
 
+  def shoot_bullet(self, entities):
+    b = Bullet(self, self.direction)
+    entities.add(b)
+
   def update(self, entities):
     dx, dy = (0, 0)
 
-    if UpKeys.key_down(pygame.K_LEFT): dx -= self.speed
-    if UpKeys.key_down(pygame.K_RIGHT): dx += self.speed
+    if UpKeys.key_down(pygame.K_x) and Tick.get(self.cooldown): self.shoot_bullet(entities)
+    if UpKeys.key_down(pygame.K_LEFT):
+      dx -= self.speed
+      self.direction = (-1, 0)
+    if UpKeys.key_down(pygame.K_RIGHT):
+      dx += self.speed
+      self.direction = (1, 0)
+    if UpKeys.key_down(pygame.K_UP):
+      self.direction = (0, -1)
     if UpKeys.key_down(pygame.K_SPACE): dy = -20
 
     self.vy -= GRAVITY
