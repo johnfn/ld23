@@ -1,3 +1,4 @@
+from __future__ import division
 import sys, pygame, spritesheet, wordwrap
 from wordwrap import render_textrect
 
@@ -13,6 +14,7 @@ MAP_SIZE_PIXELS = MAP_SIZE_TILES * TILE_SIZE
 
 BULLET_DEPTH = 50
 TEXT_DEPTH = 100
+BAR_DEPTH = 200
 
 DEBUG = True
 
@@ -226,11 +228,11 @@ class Map(Entity):
     self.mapy = y
     entities.remove_all("map_element")
 
-    self.mapdata = TileSheet.get('map.png', self.mapx, self.mapy)
+    self.mapdata = TileSheet.get('laderp.bmp', self.mapx, self.mapy)
 
     mapping = { (0, 0, 0): 1
               , (255, 255, 255): 0
-              , (255, 0, 19): 2
+              , (255, 0, 0): 2
               }
 
     for i in range(MAP_SIZE_TILES):
@@ -245,7 +247,7 @@ class Map(Entity):
         elif colors == 2:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
 
-          entities.add(Enemy(i * TILE_SIZE, j * TILE_SIZE))
+          entities.add(Enemy(i * TILE_SIZE, j * TILE_SIZE, Enemy.STRATEGY_STUPID))
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -293,7 +295,7 @@ def sign(a):
 class Text(Entity):
   def __init__(self, follow, contents):
     UpKeys.invalidate_key(pygame.K_z)
-    super(Text, self).__init__(follow.x, follow.y, ["renderable", "text", "updateable"])
+    super(Text, self).__init__(follow.x, follow.y, ["renderable", "text", "updateable", "relative"])
     self.contents = contents
     self.follow = follow
     self.shown_chars = 1
@@ -324,12 +326,53 @@ class Text(Entity):
 
     screen.blit(rendered_text, my_rect.topleft)
 
+class Bar(Entity):
+  def __init__(self, follow, color_health, color_no_health, amt, max_amt):
+    super(Bar, self).__init__(follow.x, follow.y, ["renderable", "healthbar", "relative"])
+    self.amt = amt
+    self.max_amt = max_amt
+    self.color_health = color_health
+    self.color_no_health = color_no_health
+
+    self.width = 40
+    self.height = 8
+    self.border_width = 2
+
+  def set_amt(self, x):
+    self.amt = x
+
+  def set_max_amt(self, x):
+    self.max_amt = x
+
+  def depth(self):
+    return BAR_DEPTH
+
+  def render(self, screen, dx, dy):
+    self.x = 50
+    self.y = 50
+
+    # Outer border
+    pygame.draw.rect(screen, (0, 0, 0), (50, 50, self.width, self.height))
+
+    # Inside
+    actual_w = self.width - self.border_width * 2
+    actual_h = self.height - self.border_width * 2
+    pygame.draw.rect(screen, (255, 0, 0), (self.x + self.border_width, self.y + self.border_width, actual_w, actual_h))
+
+    # 'Health'
+    health_w = (self.amt / self.max_amt) * actual_w
+    pygame.draw.rect(screen, (0, 255, 0), (self.x + self.border_width, self.y + self.border_width, health_w, actual_h))
+
+
 class Enemy(Entity):
   STRATEGY_STUPID = 0
+  STRATEGY_SENTRY = 1
+  hp = {STRATEGY_STUPID: 5}
 
-  def __init__(self, x, y):
+  def __init__(self, x, y, type):
     self.speed = 3
-    self.type = Enemy.STRATEGY_STUPID
+    self.type = type
+    self.hp = Enemy.hp[self.type]
 
     self.direction = [1, 0]
     super(Enemy, self).__init__(x, y, ["renderable", "updateable", "enemy", "relative", "map_element"], 4, 0, "tiles.png")
@@ -337,6 +380,14 @@ class Enemy(Entity):
   def update(self, entities):
     if self.type == Enemy.STRATEGY_STUPID:
       self.be_stupid(entities)
+
+  def die(self, entities):
+    entities.remove(self)
+
+  def hurt(self, amt, entities):
+    self.hp -= 1
+    if self.hp <= 0:
+      self.die(entities)
 
   def be_stupid(self, entities):
     self.x += self.direction[0]
@@ -347,12 +398,13 @@ class Enemy(Entity):
       self.direction[1] *= -1
 
 class Bullet(Entity):
-  def __init__(self, owner, direction):
+  def __init__(self, owner, direction, dmg):
     self.speed = 6
     if "character" in owner.groups: self.speed = 10
 
     self.direction = direction
     self.owner = owner
+    self.dmg = dmg
     super(Bullet, self).__init__(owner.x, owner.y, ["renderable", "updateable", "bullet", "relative", "map_element"], 3, 0, "tiles.png")
 
   def depth(self):
@@ -372,6 +424,12 @@ class Bullet(Entity):
     walls_hit = entities.get("wall", hitlambda)
     if len(walls_hit) > 0:
       entities.remove(self)
+      return
+
+    enemies_hit = entities.get("enemy", hitlambda)
+    if len(enemies_hit) > 0:
+      entities.remove(self)
+      enemies_hit[0].hurt(self.dmg, entities)
       return
 
 class Character(Entity):
@@ -399,7 +457,7 @@ class Character(Entity):
       self.y -= (MAP_SIZE_PIXELS - TILE_SIZE) * d[1]
 
   def shoot_bullet(self, entities):
-    b = Bullet(self, self.direction)
+    b = Bullet(self, self.direction, 1)
     entities.add(b)
 
   def update(self, entities):
@@ -451,7 +509,10 @@ def render_all(manager):
   y_ofs = max(min(ch.y, 400 - CHAR_XY), CHAR_XY)
 
   for e in sorted(manager.get("renderable"), key=lambda x: x.depth()):
-    e.render(screen, CHAR_XY-x_ofs, CHAR_XY-y_ofs)
+    if "relative" in e.groups:
+      e.render(screen, CHAR_XY-x_ofs, CHAR_XY-y_ofs)
+    else:
+      e.render(screen, 0, 0)
 
 def main():
   manager = Entities()
@@ -459,6 +520,8 @@ def main():
   manager.add(c)
   t = Text(c, "This is a realllllllly long text!!!!!!")
   manager.add(t)
+  b = Bar(c, (0, 255, 0), (255, 0, 0), 3, 5)
+  manager.add(b)
 
   m = Map()
   m.new_map_abs(manager, 0, 0)
