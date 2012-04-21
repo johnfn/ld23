@@ -100,7 +100,6 @@ class Entity(object):
       self.img = TileSheet.get(src_file, src_x, src_y)
       self.rect = self.img.get_rect()
 
-    self.darkness = 0
     self.uid = get_uid()
     self.events = {}
     self.groups = groups
@@ -109,11 +108,6 @@ class Entity(object):
     self.jiggling = 0
     self.old_xy = ()
     self.flashing = 0
-
-  def set_darkness(self, amt):
-    self.darkness = amt
-
-    if self.darkness != 0: self.make_dark_img()
 
   def jiggle(self):
     self.jiggling = JIGGLE_LENGTH
@@ -182,14 +176,13 @@ class Entity(object):
     self.rect.x = self.x + dx
     self.rect.y = self.y + dy
 
-    if self.darkness == NOT_DARK:
-      screen.blit(self.img, self.rect)
-    else:
-      screen.blit(self.darkimg, self.rect)
+    screen.blit(self.img, self.rect)
 
+  """
   def make_dark_img(self):
     self.darkimg = self.img.copy()
     darken(self.darkimg, self.darkness)
+  """
 
   def update(self, entities):
     if self.jiggling > 0:
@@ -198,9 +191,52 @@ class Entity(object):
       self.jiggling -= 1
 
     if self.flashing > 0:
-      #TODO
+      #TODO: Add flashing stuff here.
 
       self.flashing -= 1
+
+class LightSpot(Entity):
+  def __init__(self, x, y, intensity):
+    self.x = x
+    self.y = y
+
+    self.s = pygame.Surface((TILE_SIZE,TILE_SIZE))  # the size of your rect
+    self.s.set_alpha(intensity)
+    self.s.fill((0, 0, 0))
+
+  def render(self, screen):
+    screen.blit(self.s, (self.x, self.y))
+
+# ALL the light in the game. ALL OF IT. Make it blurry, yo. Beacon it up in here. LOL BEACON? I DONT KNOW WHAT BEACON IS. ISNT THAT A CRISPY BREAKFAST FOOD? IVE NEVER HEARD OF IT LOL.
+class Light(Entity):
+  def __init__(self, dark_values):
+    #TODO: constants.
+
+    self.dark_values = dark_values
+    self.spots = [[None for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
+    for x in range(MAP_SIZE_TILES):
+      for y in range(MAP_SIZE_TILES):
+        self.spots[x][y] = LightSpot(x * TILE_SIZE, y * TILE_SIZE, int(random.random() * 255))
+
+    self.surf = pygame.Surface((WIDTH, HEIGHT)) #TODO: make actual map size.
+    self.surf.fill((255,255,255))
+    self.surf.set_colorkey((255, 255, 255))
+
+    self.build_light()
+
+    super(Light, self).__init__(x, y, ["renderable"], 5, 0, "tiles.png")
+
+  def depth(self):
+    return -2
+
+  def build_light(self):
+    for x in range(MAP_SIZE_TILES):
+      for y in range(MAP_SIZE_TILES):
+        self.spots[x][y].render(self.surf)
+
+  def render(self, screen, dx, dy):
+    #screen.blit(self.surf, self.surf.get_rect().topleft)
+    screen.blit(self.surf, (200, 200))
 
 class Tile(Entity):
   def __init__(self, x, y, tx, ty):
@@ -323,7 +359,7 @@ class Map(Entity):
 
   def calculate_lighting(self, light_sources, entities):
     # everything starts dark.
-    self.dark_values = [[255 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
+    dark_values = [[255 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
 
     # Sources need to be aware of the entire map, so we add them last.
     for source in light_sources:
@@ -331,16 +367,20 @@ class Map(Entity):
       light_deltas = new_l.calculate_light_deltas(entities, self)
       for i, elem in enumerate(light_deltas):
         for j, delta in enumerate(elem):
-          self.dark_values[i][j] += delta
+          dark_values[i][j] += delta
 
-          if self.dark_values[i][j] > 255: self.dark_values[i][j] = 255
-          if self.dark_values[i][j] < 0: self.dark_values[i][j] = 0
+          if dark_values[i][j] > 255: dark_values[i][j] = 255
+          if dark_values[i][j] < 0: dark_values[i][j] = 0
 
       entities.add(new_l)
 
+    """
     for i in range(MAP_SIZE_TILES):
       for j in range(MAP_SIZE_TILES):
         self.tiles[i][j].set_darkness(self.dark_values[i][j])
+    """
+
+    entities.add(Light(dark_values))
 
 class UpKeys:
   """ Simple abstraction to check for recent key released behavior. """
@@ -503,6 +543,9 @@ class Enemy(Entity):
       self.direction[1] *= -1
 
 class LightSource(Entity):
+  TYPE_BEAM = 0
+  TYPE_RADIAL = 1
+
   def __init__(self, x, y, entities, m, dir=None):
     if dir is None:
       self.direction = (1, 0)
@@ -535,7 +578,6 @@ class LightSource(Entity):
         for y in range(pos_rel[1] - radius, pos_rel[1] + radius + 1):
           if m.in_bounds((x * TILE_SIZE, y * TILE_SIZE)):
             point_intensity = -max(0, 255 - (abs(x - pos_rel[0]) + abs(y - pos_rel[1])) * self.falloff)
-            print point_intensity
             deltas[x][y] += point_intensity
 
       if cur_dir[0] == 0 and cur_dir[1] == 0: break
