@@ -1,4 +1,5 @@
 import sys, pygame, spritesheet, wordwrap
+from wordwrap import render_textrect
 
 WIDTH = HEIGHT = 300
 TILE_SIZE = 20
@@ -7,6 +8,10 @@ CHAR_XY = WIDTH / 2
 GRAVITY = 2
 MAP_SIZE_TILES = 20
 MAP_SIZE_PIXELS = MAP_SIZE_TILES * TILE_SIZE
+
+#depths
+
+TEXT_DEPTH = 100
 
 DEBUG = True
 
@@ -115,6 +120,7 @@ class Entity(object):
       callback()
 
   # How high/low this object is
+  # Big = on top.
   def depth(self):
     return 0
 
@@ -265,6 +271,26 @@ def sign(a):
   if a < 0: return -1
   return 0
 
+class Text(Entity):
+  def __init__(self, follow, contents):
+    super(Text, self).__init__(follow.x, follow.y, ["renderable", "text"])
+    self.contents = contents
+    self.follow = follow
+
+  def depth(self):
+    return TEXT_DEPTH
+
+  def render(self, screen, dx, dy):
+    my_width = 100
+    my_font = pygame.font.Font("nokiafc22.ttf", 12)
+
+    my_rect = pygame.Rect((self.follow.x + dx - my_width / 2, self.follow.y + dy - len(self.contents) - 30, my_width, 70))
+    if my_rect.x < 0:
+      my_rect.x = 0
+    rendered_text = render_textrect(self.contents, my_font, my_rect, (10, 10, 10), (255, 255, 255), False, 1)
+
+    screen.blit(rendered_text, my_rect.topleft)
+
 class Character(Entity):
   def __init__(self, x, y):
     super(Character, self).__init__(x, y, ["renderable", "updateable", "character", "relative"], 0, 1, "tiles.bmp")
@@ -332,12 +358,16 @@ def render_all(manager):
   x_ofs = max(min(ch.x, 400 - CHAR_XY), CHAR_XY)
   y_ofs = max(min(ch.y, 400 - CHAR_XY), CHAR_XY)
 
-  for e in manager.get("renderable"):
+  for e in sorted(manager.get("renderable"), key=lambda x: x.depth()):
+    print e.groups
     e.render(screen, CHAR_XY-x_ofs, CHAR_XY-y_ofs)
 
 def main():
   manager = Entities()
-  manager.add(Character(40, 40))
+  c = Character(40, 40)
+  manager.add(c)
+  t = Text(c, "Wazzup?")
+  manager.add(t)
 
   m = Map()
   m.new_map_abs(manager, 0, 0)
