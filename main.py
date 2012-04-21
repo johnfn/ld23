@@ -200,9 +200,8 @@ class LightSpot(Entity):
     self.x = x
     self.y = y
 
-    self.s = pygame.Surface((TILE_SIZE,TILE_SIZE))  # the size of your rect
-    self.s.set_alpha(intensity)
-    self.s.fill((0, 0, 0))
+    self.s = pygame.Surface((TILE_SIZE,TILE_SIZE), pygame.SRCALPHA)  # the size of your rect
+    self.s.fill((0, 0, 0, intensity))
 
   def render(self, screen):
     screen.blit(self.s, (self.x, self.y))
@@ -218,16 +217,14 @@ class Light(Entity):
       for y in range(MAP_SIZE_TILES):
         self.spots[x][y] = LightSpot(x * TILE_SIZE, y * TILE_SIZE, int(random.random() * 255))
 
-    self.surf = pygame.Surface((WIDTH, HEIGHT)) #TODO: make actual map size.
-    self.surf.fill((255,255,255))
-    self.surf.set_colorkey((255, 255, 255))
+    self.surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA) #TODO: make actual map size.
 
     self.build_light()
 
     super(Light, self).__init__(x, y, ["renderable"], 5, 0, "tiles.png")
 
   def depth(self):
-    return -2
+    return 2
 
   def build_light(self):
     for x in range(MAP_SIZE_TILES):
