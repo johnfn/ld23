@@ -28,6 +28,7 @@ INSANE_LIGHT = 150
 
 LIGHT_DEPTH = 2
 LIGHT_SOURCE_DEPTH = 5
+PARTICLE_DEPTH = 10
 BULLET_DEPTH = 50
 TEXT_DEPTH = 100
 BAR_DEPTH = 200
@@ -192,12 +193,6 @@ class Entity(object):
 
     screen.blit(self.img, self.rect)
 
-  """
-  def make_dark_img(self):
-    self.darkimg = self.img.copy()
-    darken(self.darkimg, self.darkness)
-  """
-
   def update(self, entities):
     if self.jiggling > 0:
       self.x = self.x + random.randrange(-JIGG_RANGE, JIGG_RANGE)
@@ -208,6 +203,48 @@ class Entity(object):
       #TODO: Add flashing stuff here.
 
       self.flashing -= 1
+
+class Particles(Entity):
+  NUM_PARTICLES = 100
+
+  def __init__(self, entities):
+    self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
+
+    super(Particles, self).__init__(0, 0, ["renderable", "updateable", "relative"])
+    self.particles = []
+
+    for x in range(Particles.NUM_PARTICLES):
+      #TODO So many tweakable constants.
+      p = Particle(200 + random.randrange(-100, 100), 200 + random.randrange(-100, 100))
+      self.particles.append(p)
+      entities.add(p)
+
+  def update(self, entities):
+    self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
+
+    for p in self.particles:
+      p.render(self.surf)
+
+    self.surf = blur_surf(self.surf, 5.0)
+
+  def depth(self):
+    return PARTICLE_DEPTH
+
+  def render(self, screen, dx, dy):
+    #screen.blit(self.surf, self.surf.get_rect().topleft)
+    screen.blit(self.surf, (dx, dy))
+
+class Particle(Entity):
+  def __init__(self, x, y):
+    self.x = x
+    self.y = y
+
+    super(Particle, self).__init__(x, y, [], 7, 0, "tiles.png")
+    self.trans_img = self.img.copy()
+    self.trans_img.set_colorkey((0, 0, 0))
+
+  def render(self, screen):
+    screen.blit(self.trans_img, (self.x, self.y))
 
 class LightSpot(Entity):
   def __init__(self, x, y, intensity):
@@ -407,6 +444,7 @@ class Map(Entity):
     """
 
     entities.add(Light(dark_values))
+    entities.add(Particles(entities))
     self.light_deltas = dark_values
 
 
