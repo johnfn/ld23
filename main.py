@@ -24,6 +24,7 @@ MAX_HEALTH_INC = 3
 
 #depths
 
+LIGHT_DEPTH = 2
 LIGHT_SOURCE_DEPTH = 5
 BULLET_DEPTH = 50
 TEXT_DEPTH = 100
@@ -43,6 +44,17 @@ def darken(surface, value):
     dark = pygame.Surface(surface.get_size(), 32)
     dark.set_alpha(value, pygame.RLEACCEL)
     surface.blit(dark, (0, 0))
+
+def blur_surf(surface, amt):
+    if amt < 1.0: raise ValueError("Arg 'amt' must be greater than 1.0, passed in value is %s"%amt)
+
+    scale = 1.0/float(amt)
+    surf_size = surface.get_size()
+    scale_size = (int(surf_size[0]*scale), int(surf_size[1]*scale))
+    surf = pygame.transform.smoothscale(surface, scale_size)
+    surf = pygame.transform.smoothscale(surf, surf_size)
+    return surf
+
 
 class Tick:
   tick = 0
@@ -197,6 +209,8 @@ class Entity(object):
 
 class LightSpot(Entity):
   def __init__(self, x, y, intensity):
+    if intensity > 200: intensity = 200
+
     self.x = x
     self.y = y
 
@@ -215,25 +229,27 @@ class Light(Entity):
     self.spots = [[None for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
     for x in range(MAP_SIZE_TILES):
       for y in range(MAP_SIZE_TILES):
-        self.spots[x][y] = LightSpot(x * TILE_SIZE, y * TILE_SIZE, int(random.random() * 255))
+        self.spots[x][y] = LightSpot(x * TILE_SIZE, y * TILE_SIZE, dark_values[x][y])
 
-    self.surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA) #TODO: make actual map size.
+    self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
 
     self.build_light()
 
-    super(Light, self).__init__(x, y, ["renderable"], 5, 0, "tiles.png")
+    super(Light, self).__init__(x, y, ["renderable", "relative"], 5, 0, "tiles.png")
 
   def depth(self):
-    return 2
+    return LIGHT_DEPTH
 
   def build_light(self):
     for x in range(MAP_SIZE_TILES):
       for y in range(MAP_SIZE_TILES):
         self.spots[x][y].render(self.surf)
 
+    self.surf = blur_surf(self.surf, 25.0)
+
   def render(self, screen, dx, dy):
     #screen.blit(self.surf, self.surf.get_rect().topleft)
-    screen.blit(self.surf, (200, 200))
+    screen.blit(self.surf, (dx, dy))
 
 class Tile(Entity):
   def __init__(self, x, y, tx, ty):
