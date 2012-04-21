@@ -1,9 +1,9 @@
 import sys, pygame, spritesheet, wordwrap
 
-WIDTH = HEIGHT = 500
+WIDTH = HEIGHT = 300
 TILE_SIZE = 20
 VISIBLE_MAP_SIZE = 10
-CHAR_XY = VISIBLE_MAP_SIZE * TILE_SIZE / 2
+CHAR_XY = WIDTH / 2
 
 DEBUG = True
 
@@ -257,7 +257,7 @@ class UpKeys:
 class Character(Entity):
   def __init__(self, x, y):
     super(Character, self).__init__(x, y, ["renderable", "updateable", "character", "relative"], 0, 1, "tiles.bmp")
-    self.speed = 1
+    self.speed = 5
 
   def collides_with_wall(self, entities):
     return entities.any("wall", lambda x: x.touches_rect(self))
@@ -284,8 +284,8 @@ class Character(Entity):
 
 def render_all(manager):
   ch = manager.one("character")
-  x_ofs = ch.x
-  y_ofs = ch.y
+  x_ofs = max(min(ch.x, 400 - CHAR_XY), CHAR_XY)
+  y_ofs = max(min(ch.y, 400 - CHAR_XY), CHAR_XY)
 
   for e in manager.get("renderable"):
     e.render(screen, CHAR_XY-x_ofs, CHAR_XY-y_ofs)
