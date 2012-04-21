@@ -343,6 +343,7 @@ class Map(Entity):
               , (255, 255, 255): 0
               , (255, 0, 0): 2 #dumbEnemy
               , (0, 0, 255): 3 #light source
+              , (100, 100, 100): 4 #reflector
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -363,6 +364,9 @@ class Map(Entity):
         elif colors == 3:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           light_sources.append([i * TILE_SIZE, j * TILE_SIZE])
+        elif colors == 4:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          entities.add(Reflector(i * TILE_SIZE, j * TILE_SIZE, None))
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -515,6 +519,13 @@ class Bar(Entity):
     health_w = (self.amt / self.max_amt) * actual_w
     pygame.draw.rect(screen, (0, 255, 0), (self.x + self.border_width + dx, self.y + self.border_width + dy, health_w, actual_h))
 
+class Reflector(Entity):
+  def __init__(self, x, y, type):
+    self.direction = [1, 0]
+    super(Reflector, self).__init__(x, y, ["renderable", "reflector"], 6, 0, "tiles.png")
+
+  def reflect(self, direction):
+    return [direction[1], -direction[0]]
 
 class Enemy(Entity):
   STRATEGY_STUPID = 0
@@ -594,6 +605,13 @@ class LightSource(Entity):
             deltas[x][y] += point_intensity
 
       if cur_dir[0] == 0 and cur_dir[1] == 0: break
+
+      reflectors = entities.get("reflector", lambda e: e.x == pos_abs[0] and e.y == pos_abs[1])
+
+      if len(reflectors) > 0:
+        cur_dir = reflectors[0].reflect(cur_dir)
+
+        print cur_dir
 
       pos_abs[0] += cur_dir[0] * TILE_SIZE
       pos_abs[1] += cur_dir[1] * TILE_SIZE
