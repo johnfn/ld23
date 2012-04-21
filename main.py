@@ -184,6 +184,9 @@ class Entities:
   def any(self, *criteria):
     return len(self.get(*criteria)) > 0
 
+  def remove(self, obj):
+    self.entities = [e for e in self.entities if e.uid != obj.uid]
+
   def remove_all(self, *criteria):
     retained = []
 
@@ -249,6 +252,10 @@ class UpKeys:
     UpKeys.keysup.append(val)
     UpKeys.keysactive.append(val)
 
+  @staticmethod
+  def invalidate_key(val):
+    if val in UpKeys.keysup: UpKeys.keysup.remove(val)
+
   # This is a setter.
   @staticmethod
   def release_key(val):
@@ -273,12 +280,17 @@ def sign(a):
 
 class Text(Entity):
   def __init__(self, follow, contents):
-    super(Text, self).__init__(follow.x, follow.y, ["renderable", "text"])
+    UpKeys.invalidate_key(pygame.K_z)
+    super(Text, self).__init__(follow.x, follow.y, ["renderable", "text", "updateable"])
     self.contents = contents
     self.follow = follow
 
   def depth(self):
     return TEXT_DEPTH
+
+  def update(self, entities):
+    if UpKeys.key_up(pygame.K_z):
+      entities.remove(self)
 
   def render(self, screen, dx, dy):
     my_width = 100
@@ -359,14 +371,13 @@ def render_all(manager):
   y_ofs = max(min(ch.y, 400 - CHAR_XY), CHAR_XY)
 
   for e in sorted(manager.get("renderable"), key=lambda x: x.depth()):
-    print e.groups
     e.render(screen, CHAR_XY-x_ofs, CHAR_XY-y_ofs)
 
 def main():
   manager = Entities()
   c = Character(40, 40)
   manager.add(c)
-  t = Text(c, "Wazzup?")
+  t = Text(c, "This is a realllllllly long text!!!!!!")
   manager.add(t)
 
   m = Map()
@@ -392,10 +403,11 @@ def main():
       if event.type == pygame.KEYUP:
         UpKeys.release_key(event.key)
 
-    if UpKeys.key_down(113) and UpKeys.key_down(310): # Q and CMD
+    if UpKeys.key_down(pygame.K_w) and UpKeys.key_down(310): # Q and CMD
       break
 
-    for e in manager.get("updateable"):
+    #TODO: Better is a updateDepth() on each entity.
+    for e in sorted(manager.get("updateable"), key=lambda x: x.depth()):
       e.update(manager)
 
     screen.fill((255, 255, 255))
