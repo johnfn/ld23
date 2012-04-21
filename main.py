@@ -19,6 +19,8 @@ NOT_DARK = 0
 JIGGLE_LENGTH = 50
 JIGG_RANGE = 3
 
+MIN_LIGHT = 180
+
 #gameplay
 
 MAX_HEALTH_INC = 3
@@ -279,7 +281,7 @@ class LightBeam(Entity):
 
 class LightSpot(Entity):
   def __init__(self, x, y, intensity):
-    if intensity > 200: intensity = 200
+    if intensity > MIN_LIGHT: intensity = MIN_LIGHT
 
     self.x = x
     self.y = y
@@ -292,7 +294,7 @@ class LightSpot(Entity):
 
 # ALL the light in the game. ALL OF IT. Make it blurry, yo. Beacon it up in here. LOL BEACON? I DONT KNOW WHAT BEACON IS. ISNT THAT A CRISPY BREAKFAST FOOD? IVE NEVER HEARD OF IT LOL.
 class Light(Entity):
-  def __init__(self, dark_values, light_objs, entities, m):
+  def __init__(self, light_objs, entities, m):
     #TODO: constants.
 
     self.light_objs = light_objs
@@ -303,19 +305,22 @@ class Light(Entity):
   def depth(self):
     return LIGHT_DEPTH
 
+  def get_lighting_rel(self, x, y):
+    return self.ambient_light[x][y]
+
   def calculate_ambient_light(self, entities, m):
-    dark_values = [[255 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
+    ambient_light = [[255 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
 
     for source in entities.get("light-source"):
       light_deltas = source.calculate_light_deltas(entities, m)
       for i, elem in enumerate(light_deltas):
         for j, delta in enumerate(elem):
-          dark_values[i][j] += delta
+          ambient_light[i][j] += delta
 
-          if dark_values[i][j] > 255: dark_values[i][j] = 255
-          if dark_values[i][j] < 0: dark_values[i][j] = 0
+          if ambient_light[i][j] > 255: ambient_light[i][j] = 255
+          if ambient_light[i][j] < 0: ambient_light[i][j] = 0
 
-    self.dark_values = dark_values
+    self.ambient_light = ambient_light
 
   def recalculate_light(self, entities, m):
     self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA)
@@ -326,7 +331,7 @@ class Light(Entity):
     self.spots = [[None for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
     for x in range(MAP_SIZE_TILES):
       for y in range(MAP_SIZE_TILES):
-        self.spots[x][y] = LightSpot(x * TILE_SIZE, y * TILE_SIZE, self.dark_values[x][y])
+        self.spots[x][y] = LightSpot(x * TILE_SIZE, y * TILE_SIZE, self.ambient_light[x][y])
 
     # build an array of every beam object created by every light.
     self.beams = []
@@ -484,11 +489,11 @@ class Map(Entity):
     return "wall" in self.tiles[i][j].groups
 
   def get_lighting_rel(self, i, j):
+    assert(false)
     return self.light_deltas[i][j]
 
   def calculate_lighting(self, light_sources, entities):
     # everything starts dark.
-    dark_values = [[255 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
     light_objs = []
 
     # Sources need to be aware of the entire map, so we add them last.
@@ -500,8 +505,7 @@ class Map(Entity):
 
     # the only things that generate particles currently are lights. thats why i pass in light_objs, not particle_objs.
     entities.add(Particles(entities, light_objs))
-    entities.add(Light(dark_values, light_objs, entities, self))
-    self.light_deltas = dark_values
+    entities.add(Light(light_objs, entities, self))
 
 
 class UpKeys:
@@ -941,7 +945,7 @@ class Character(Entity):
       self.vy = 0
 
     self.check_new_map(entities)
-    self.check_sanity(entities.one("map"))
+    self.check_sanity(entities)
 
   def soft_death(self):
     print "soft death!"
@@ -949,7 +953,7 @@ class Character(Entity):
   def depth(self):
     return CHAR_DEPTH
 
-  def check_sanity(self, m):
+  def check_sanity(self, entities):
     if self.sanity < 0: self.sanity = 0
     if self.sanity > self.max_sanity: self.sanity = self.max_sanity
 
@@ -960,7 +964,7 @@ class Character(Entity):
     else:
       self.sanity_bar.visible = False
 
-    if not m.get_lighting_rel(int(self.x/20), int(self.y/20)) > INSANE_LIGHT: 
+    if not entities.one("all-lights").get_lighting_rel(int(self.x/20), int(self.y/20)) > INSANE_LIGHT: 
       if self.sanity < self.max_sanity:
         if Tick.get(6): 
           self.sanity += 1
