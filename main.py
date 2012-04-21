@@ -34,17 +34,6 @@ class Tick:
   def get(prob=1):
     return (Tick.tick % prob == 0)
 
-class Point:
-  def __init__(self, x, y):
-    self.x = x
-    self.y = y
-
-  def __cmp__(self, other):
-    return 0 if self.x == other.x and self.y == other.y else 1
-
-  def __str__(self):
-    return "<Point x : %f y : %f>" % (self.x, self.y)
-
 class TileSheet:
   """ Memoize all the sheets so we don't load in 1 sheet like 50 times and
   squander resources. This is a singleton, which is generally frowned upon,
@@ -77,8 +66,8 @@ class Rect(object):
     self.size = s
 
   def touches_point(self, point):
-    return self.x <= point.x <= self.x + self.size and\
-           self.y <= point.y <= self.y + self.size
+    return self.x <= point[0] <= self.x + self.size and\
+           self.y <= point[1] <= self.y + self.size
 
 class Entity(object):
   def __init__(self, x, y, groups, src_x = -1, src_y = -1, src_file = ""):
@@ -98,8 +87,8 @@ class Entity(object):
     return Rect(self.x, self.y , self.size)
 
   def touches_point(self, point):
-    return self.x <= point.x <= self.x + self.size and\
-           self.y <= point.y <= self.y + self.size
+    return self.x <= point[0] <= self.x + self.size and\
+           self.y <= point[1] <= self.y + self.size
 
   def touches_rect(self, other):
     if hasattr(self, 'uid') and hasattr(other, 'uid') and self.uid == other.uid: return False
@@ -339,10 +328,11 @@ class Bullet(Entity):
     self.x += self.direction[0] * self.speed
     self.y += self.direction[1] * self.speed
 
-    hit = entities.get(lambda x: x.touches_point(self.x + self.size/2, self.y + self.size/2))
+    hitlambda = lambda x: x.touches_point((self.x + self.size/2, self.y + self.size/2))
 
-    if len(hit) > 0:
-      entities.remove(self)
+    walls_hit = entities.get("wall", hitlambda)
+
+    if len(walls_hit) > 0: entities.remove(self)
 
 class Character(Entity):
   def __init__(self, x, y):
@@ -409,7 +399,7 @@ class Character(Entity):
     self.onground = False
 
     for p in zip(range(self.x + 2, self.x + self.size - 2), [self.y + self.size + 1] * self.size):
-      if entities.any("wall", lambda x: x.touches_point(Point(*p))):
+      if entities.any("wall", lambda x: x.touches_point(p)):
         self.onground = True
         break
 
