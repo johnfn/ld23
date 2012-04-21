@@ -275,6 +275,7 @@ class Particle(Entity):
 class LightBeam(Entity):
   def __init__(self, x, y):
     super(LightBeam, self).__init__(x, y, [], 8, 0, "tiles.png")
+    self.img.set_alpha(50)
 
 class LightSpot(Entity):
   def __init__(self, x, y, intensity):
