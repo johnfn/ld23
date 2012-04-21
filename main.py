@@ -21,6 +21,7 @@ MAX_HEALTH_INC = 3
 
 #depths
 
+LIGHT_SOURCE_DEPTH = 5
 BULLET_DEPTH = 50
 TEXT_DEPTH = 100
 BAR_DEPTH = 200
@@ -268,9 +269,11 @@ class Map(Entity):
 
     mapping = { (0, 0, 0): 1
               , (255, 255, 255): 0
-              , (255, 0, 0): 2
+              , (255, 0, 0): 2 #dumbEnemy
+              , (0, 0, 255): 3 #light source
               }
 
+    light_sources = []
     for i in range(MAP_SIZE_TILES):
       for j in range(MAP_SIZE_TILES):
         colors = mapping[tupleize(self.mapdata.get_at((i, j)))]
@@ -282,11 +285,17 @@ class Map(Entity):
           tile.add_group("wall")
         elif colors == 2:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
-
           entities.add(Enemy(i * TILE_SIZE, j * TILE_SIZE, Enemy.STRATEGY_STUPID))
+        elif colors == 3:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          light_sources.append([i * TILE_SIZE, j * TILE_SIZE])
 
         tile.add_group("map_element")
         entities.add(tile)
+
+    # Sources need to be aware of the entire map, so we add them last.
+    for source in light_sources:
+      entities.add(LightSource(source[0], source[1], entities, self))
 
 class UpKeys:
   """ Simple abstraction to check for recent key released behavior. """
@@ -447,6 +456,38 @@ class Enemy(Entity):
     if self.collides_with_wall(entities):
       self.direction[0] *= -1
       self.direction[1] *= -1
+
+class LightSpot(Entity):
+  def __init__(self, x, y, intensity):
+    self.x = x
+    self.y = y
+    self.intensity = intensity
+
+    super(LightSpot, self).__init__(x, y, ["renderable", "updateable", "lightspot", "map_element", "relative"], 5, 0, "tiles.png")
+
+class LightSource(Entity):
+  def __init__(self, x, y, entities, m, dir=None):
+    if dir is None:
+      self.direction = (1, 0)
+    else:
+      self.direction = dir
+
+    super(LightSource, self).__init__(x, y, ["renderable", "updateable", "map_element", "lightsource"], 5, 0, "tiles.png")
+
+    self.create_light(entities, m)
+
+  def create_light(self, entities, m):
+    pos = [self.x, self.y]
+    cur_dir = self.direction
+
+    while m.in_bounds(pos) and not entities.any("wall", lambda e: e.x == pos[0] and e.y == pos[1]):
+      new_spot = LightSpot(pos[0], pos[1], entities)
+      entities.add(new_spot)
+      pos[0] += cur_dir[0] * TILE_SIZE
+      pos[1] += cur_dir[1] * TILE_SIZE
+
+  def depth(self):
+    return LIGHT_SOURCE_DEPTH
 
 class Bullet(Entity):
   def __init__(self, owner, direction, dmg):
