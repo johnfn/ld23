@@ -30,6 +30,7 @@ LIGHT_DEPTH = 2
 LIGHT_SOURCE_DEPTH = 5
 PARTICLE_DEPTH = 10
 BULLET_DEPTH = 50
+CHAR_DEPTH = 80
 TEXT_DEPTH = 100
 BAR_DEPTH = 200
 
@@ -214,12 +215,6 @@ class Particles(Entity):
     self.particle_sources = particle_sources
     self.tick = 0
 
-    for source in self.particle_sources:
-      if "beamlight" in source.groups:
-        for beam_pos in source.light_beam_pos():
-          print beam_pos
-          self.beams.append(LightBeam(beam_pos[0], beam_pos[1]))
-
   def update(self, entities):
     self.tick += 1
     self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
@@ -238,9 +233,6 @@ class Particles(Entity):
     for p in self.particles:
       p.update()
       p.render(self.surf)
-
-    for beam in self.beams:
-      beam.render(self.surf)
 
     self.surf = blur_surf(self.surf, 5.0)
 
@@ -299,10 +291,12 @@ class LightSpot(Entity):
 
 # ALL the light in the game. ALL OF IT. Make it blurry, yo. Beacon it up in here. LOL BEACON? I DONT KNOW WHAT BEACON IS. ISNT THAT A CRISPY BREAKFAST FOOD? IVE NEVER HEARD OF IT LOL.
 class Light(Entity):
-  def __init__(self, dark_values):
+  def __init__(self, dark_values, light_objs):
     #TODO: constants.
 
+    self.light_objs = light_objs
     self.dark_values = dark_values
+    self.beams = []
     self.spots = [[None for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
     for x in range(MAP_SIZE_TILES):
       for y in range(MAP_SIZE_TILES):
@@ -318,15 +312,30 @@ class Light(Entity):
     return LIGHT_DEPTH
 
   def build_light(self):
+    # build an array of every beam object created by every light.
+    self.beams = []
+
+    for source in self.light_objs:
+      if "beamlight" in source.groups:
+        for beam_pos in source.light_beam_pos():
+          print beam_pos
+          self.beams.append(LightBeam(beam_pos[0], beam_pos[1]))
+
     for x in range(MAP_SIZE_TILES):
       for y in range(MAP_SIZE_TILES):
         self.spots[x][y].render(self.surf)
 
-    self.surf = blur_surf(self.surf, 25.0)
+    self.surf = blur_surf(self.surf, 15.0)
+
+    for beam in self.beams:
+      beam.render(self.surf)
+
+    self.surf = blur_surf(self.surf, 10.0)
 
   def render(self, screen, dx, dy):
     #screen.blit(self.surf, self.surf.get_rect().topleft)
     screen.blit(self.surf, (dx, dy))
+
 
 class Tile(Entity):
   def __init__(self, x, y, tx, ty):
@@ -481,8 +490,9 @@ class Map(Entity):
       light_objs.append(new_l)
       entities.add(new_l)
 
+    # the only things that generate particles currently are lights. thats why i pass in light_objs, not particle_objs.
     entities.add(Particles(entities, light_objs))
-    entities.add(Light(dark_values))
+    entities.add(Light(dark_values, light_objs))
     self.light_deltas = dark_values
 
 
@@ -906,6 +916,9 @@ class Character(Entity):
 
   def soft_death(self):
     print "soft death!"
+
+  def depth(self):
+    return CHAR_DEPTH
 
   def check_sanity(self, m):
     if self.sanity < 0: self.sanity = 0
