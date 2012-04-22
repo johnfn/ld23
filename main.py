@@ -35,6 +35,8 @@ ITEM_DRIFT_SPEED = 20
 #depths
 
 LIGHT_DEPTH = 2
+SWITCH_DEPTH = 2
+PUSH_BLOCK_DEPTH = 3
 LIGHT_SOURCE_DEPTH = 5
 ENEMY_DEPTH = 8
 PARTICLE_DEPTH = 10
@@ -143,6 +145,49 @@ class Entity(object):
     self.fade_out = False
     self.fade_in = False
     self.alpha = 255
+    self.anim = []
+
+  def animate(self, frames):
+    self.anim = frames
+
+  def push(self, direction, entities):
+    assert "pushable" in self.groups
+    new_x = self.x + direction[0] * TILE_SIZE
+    new_y = self.y + direction[1] * TILE_SIZE
+
+    if entities.any("wall", lambda e: e.x == new_x and e.y == new_y): return
+    self.move(new_x, new_y, entities)
+
+    switch = entities.one("switch")
+    if switch.touches_rect(self):
+      switch.activate(entities)
+    else:
+      switch.deactivate(entities)
+
+  def move(self, x, y, entities):
+    self.x = x
+    self.y = y
+
+    if "beamlight" in self.groups: self.beamtick = BEAM_START_LENGTH
+
+    if "persistent" not in self.groups: return
+
+    went_offscreen = False
+
+    if self.x < 0: 
+      self.x = MAP_SIZE_PIXELS - TILE_SIZE * 2
+      self.restore_map_xy = (self.restore_map_xy[0] - 1, self.restore_map_xy[1])
+      went_offscreen = True
+    elif self.x > MAP_SIZE_PIXELS:
+      self.x = TILE_SIZE * 2
+      self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
+      went_offscreen = True
+    elif self.y > MAP_SIZE_PIXELS:
+      self.y = TILE_SIZE * 2
+      self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
+      went_offscreen = True
+
+    if went_offscreen: self.restore_xy = (self.x, self.y)
 
   def getvis(self): 
     return self.visible
@@ -235,6 +280,9 @@ class Entity(object):
 
   def update(self, entities):
     assert(not self.fade_out or not self.fade_in)
+
+    if len(self.anim) > 0 and Tick.get(8):
+      self.img = TileSheet.get("tiles.png", *self.anim.pop(0))
 
     if self.zooming:
       if abs(self.x - self.zoom_pos[0]) + abs(self.y - self.zoom_pos[1]) > 5:
@@ -422,6 +470,7 @@ class Light(Entity):
 
 class Tile(Entity):
   def __init__(self, x, y, tx, ty):
+    self.anim = []
     super(Tile, self).__init__(x, y, ["renderable", "updateable", "relative"], tx, ty, "tiles.png")
 
   def update(self, entities):
@@ -537,6 +586,8 @@ class Map(Entity):
               , (50, 0, 0): 7 # science-wall
               , (100, 0, 0): 8 # sweeper
               , (222, 222, 222): 9 # push-crate
+              , (0, 255, 0): 10 # switch
+              , (0, 100, 0): 11 # lock-box
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -586,7 +637,14 @@ class Map(Entity):
           entities.add(Enemy(i * TILE_SIZE, j * TILE_SIZE, Enemy.STRATEGY_SWEEPER))
         elif colors == 9:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
-          entities.add(PushBlock(i * TILE_SIZE, j * TILE_SIZE, self))
+          if new_map: entities.add(PushBlock(i * TILE_SIZE, j * TILE_SIZE, self))
+        elif colors == 10:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          entities.add(Switch(i * TILE_SIZE, j * TILE_SIZE))
+        elif colors == 11:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 7, 2)
+          tile.add_group("lock")
+          tile.add_group("wall")
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -747,43 +805,31 @@ class Bar(Entity):
 class PushBlock(Entity):
   def __init__(self, x, y, m):
     self.direction = [1, 0]
-    super(PushBlock, self).__init__(x, y, ["renderable", "persistent", "wall", "pushable", "relative"], 6, 2, "tiles.png")
+    super(PushBlock, self).__init__(x, y, ["renderable", "switchpusher", "persistent", "wall", "pushable", "relative"], 6, 2, "tiles.png")
     self.restore_xy = (self.x, self.y)
     self.restore_map_xy = m.get_mapxy()
 
-  def push(self, direction, entities):
-    new_x = self.x + direction[0] * TILE_SIZE
-    new_y = self.y + direction[1] * TILE_SIZE
+  def depth(self):
+    return PUSH_BLOCK_DEPTH
 
-    if entities.any("wall", lambda e: e.x == new_x and e.y == new_y): return
-    self.move(new_x, new_y, entities)
+class Switch(Entity):
+  def __init__(self, x, y):
+    super(Switch, self).__init__(x, y, ["renderable", "switch", "relative"], 4, 3, "tiles.png")
 
   def depth(self):
-    return 2
+    return SWITCH_DEPTH
 
-  def move(self, x, y, entities):
-    self.x = x
-    self.y = y
+  def activate(self, entities):
+    for e in entities.get("lock"):
+      e.groups.remove("wall")
+      e.animate([[0, 0]])
 
-    went_offscreen = False
+  def deactivate(self, entities):
+    for e in entities.get("lock"):
+      if "wall" not in e.groups:
+        e.add_group("wall")
+        e.animate([[7, 2]])
 
-    if self.x < 0: 
-      self.x = MAP_SIZE_PIXELS - TILE_SIZE * 2
-      self.restore_map_xy = (self.restore_map_xy[0] - 1, self.restore_map_xy[1])
-      went_offscreen = True
-    elif self.x > MAP_SIZE_PIXELS:
-      self.x = TILE_SIZE * 2
-      self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
-      went_offscreen = True
-    elif self.y > MAP_SIZE_PIXELS:
-      self.y = TILE_SIZE * 2
-      self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
-      went_offscreen = True
-
-    if went_offscreen:
-      self.restore_xy = (self.x, self.y)
-
-    if "beamlight" in self.groups: self.beamtick = BEAM_START_LENGTH
 class Reflector(Entity):
   def __init__(self, x, y, type):
     self.direction = [1, 0]
@@ -929,37 +975,6 @@ class LightSource(Entity):
 
     assert(self.x % TILE_SIZE == 0)
     assert(self.y % TILE_SIZE == 0)
-
-  def push(self, direction, entities):
-    new_x = self.x + direction[0] * TILE_SIZE
-    new_y = self.y + direction[1] * TILE_SIZE
-
-    if entities.any("wall", lambda e: e.x == new_x and e.y == new_y): return
-    self.move(new_x, new_y, entities)
-
-  def move(self, x, y, entities):
-    self.x = x
-    self.y = y
-
-    went_offscreen = False
-
-    if self.x < 0: 
-      self.x = MAP_SIZE_PIXELS - TILE_SIZE * 2
-      self.restore_map_xy = (self.restore_map_xy[0] - 1, self.restore_map_xy[1])
-      went_offscreen = True
-    elif self.x > MAP_SIZE_PIXELS:
-      self.x = TILE_SIZE * 2
-      self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
-      went_offscreen = True
-    elif self.y > MAP_SIZE_PIXELS:
-      self.y = TILE_SIZE * 2
-      self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
-      went_offscreen = True
-
-    if went_offscreen:
-      self.restore_xy = (self.x, self.y)
-
-    if "beamlight" in self.groups: self.beamtick = BEAM_START_LENGTH
 
   def calculate_light_deltas(self, entities, m):
     if self.light_type == LightSource.BEAM:
