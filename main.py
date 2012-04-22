@@ -21,13 +21,13 @@ JIGGLE_LENGTH = 50
 JIGG_RANGE = 3
 
 MIN_LIGHT = 180
-
 CAM_LAG = 20
 
 #gameplay
 
 MAX_HEALTH_INC = 3
 INSANE_LIGHT = 150
+BEAM_START_LENGTH = 5
 
 #depths
 
@@ -507,7 +507,7 @@ class Map(Entity):
         elif colors == 5:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           #particle_sources.append([i * TILE_SIZE, j * TILE_SIZE])
-          light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.RADIAL])
+          light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.BEAM])
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -724,7 +724,7 @@ class LightSource(Entity):
     super(LightSource, self).__init__(x, y, ["wall", "renderable", "relative", "updateable", "map_element", "light-source"], 5, 0, "tiles.png")
 
     if light_type == LightSource.BEAM:
-      self.beamtick = 1
+      self.beamtick = BEAM_START_LENGTH
       self.groups.append("beamlight")
       self.groups.append("pushable")
 
@@ -742,10 +742,11 @@ class LightSource(Entity):
     self.x = x
     self.y = y
 
-    if "beamlight" in self.groups: self.beamtick = 0
+    if "beamlight" in self.groups: self.beamtick = BEAM_START_LENGTH
 
   def calculate_light_deltas(self, entities, m):
     if self.light_type == LightSource.BEAM:
+      self.beamtick += 1
       return self.beam_deltas(entities, m)
     elif self.light_type == LightSource.RADIAL:
       return self.radial_deltas(entities, m)
@@ -787,7 +788,10 @@ class LightSource(Entity):
     pos_rel = [int(self.x / TILE_SIZE), int(self.y / TILE_SIZE)]
     cur_dir = self.direction
 
+    length = 0
     while m.in_bounds(pos_abs) and not entities.any("wall", lambda e: e.x == pos_abs[0] and e.y == pos_abs[1] and e.uid != self.uid):
+      length += 1
+      if length > self.beamtick: break
       # bugginess of this line approaches 1...
       deltas[pos_rel[0]][pos_rel[1]] = self.intensity
       self.lightbeampos.append((pos_abs[0], pos_abs[1]))
