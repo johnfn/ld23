@@ -864,7 +864,7 @@ class Bar(Entity):
 class PushBlock(Entity):
   def __init__(self, x, y, m):
     self.direction = [1, 0]
-    super(PushBlock, self).__init__(x, y, ["renderable", "updateable", "switchpusher", "persistent", "wall", "pushable", "relative"], 6, 2, "tiles.png")
+    super(PushBlock, self).__init__(x, y, ["crate", "renderable", "updateable", "switchpusher", "persistent", "wall", "pushable", "relative"], 6, 2, "tiles.png")
     self.restore_xy = (self.x, self.y)
     self.restore_map_xy = m.get_mapxy()
 
@@ -928,8 +928,8 @@ class Reflector(Entity):
   def depth(self): return 1
 
 class Dialog(Entity):
-  DIALOGS = { (0, 0): "Hmm. The ball shoots light in all directions." 
-            , (1, 0): "The darkness will drive you mad if you stay in it too long. The white bar represents your sanity.\n\nJump with space."
+  DIALOGS = { (0, 0): "Hmm. The ball shoots light in all directions.\n\nJump with space." 
+            , (1, 0): "The darkness will drive you mad if you stay in it too long. The white bar represents your sanity."
             , (2, 0): "And these are directional lights. More powerful, but they only fire in a single direction."
             , (3, 0): "Fire your trusty gun with the X key."
             }
@@ -1007,7 +1007,7 @@ class Enemy(Entity):
 
     self.direction = [1, 0]
     if self.type == Enemy.STRATEGY_STUPID:
-      super(Enemy, self).__init__(x, y, ["renderable", "updateable", "knocked", "enemy", "relative", "map_element"], 4, 0, "tiles.png")
+      super(Enemy, self).__init__(x, y, ["renderable", "switchpusher", "updateable", "knocked", "enemy", "relative", "map_element"], 4, 0, "tiles.png")
     elif self.type == Enemy.STRATEGY_SENTRY:
       super(Enemy, self).__init__(x, y, ["renderable", "updateable", "enemy", "relative", "map_element"], 7, 1, "tiles.png")
     elif self.type == Enemy.STRATEGY_SWEEPER:
@@ -1083,6 +1083,16 @@ class Enemy(Entity):
       entities.add(b)
   
   def be_stupid(self, entities):
+    m = entities.one("map")
+
+    print entities.get("crate")[0].y, self.y
+
+    if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1):
+      if not entities.any("crate", lambda e: e.x == self.x and e.y == self.y + TILE_SIZE):
+        if Tick.get(8):
+          self.move(self.x, self.y + TILE_SIZE, entities)
+        return
+
     self.x += self.direction[0]
     self.y += self.direction[1]
 
@@ -1551,7 +1561,7 @@ def main():
   manager.add(Particles())
 
   m = Map()
-  m.new_map_abs(manager, 0, 0)
+  m.new_map_abs(manager, 5, 3)
   manager.add(m)
 
   pygame.display.init()
