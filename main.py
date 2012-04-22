@@ -522,9 +522,9 @@ class Map(Entity):
     mapping = { (0, 0, 0): 1 # Background
               , (255, 255, 255): 0 # Wall
               , (255, 0, 0): 2 #dumbEnemy
-              , (0, 0, 255): 3 # beam light source
+              , (0, 0, 100): 3 # beam light source
               , (100, 100, 100): 4 #reflector
-              , (0, 0, 100): 5 # radial light source
+              , (0, 0, 255): 5 # radial light source
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -539,14 +539,14 @@ class Map(Entity):
         colors = all_colors[i][j]
 
         if colors == 0:
-          backgrounds = [((0, 0), 0.9), ((10, 0), 0.003), ((11, 0), 0.003)]
+          backgrounds = [((0, 0), 0.9), ((10, 0), 0.03), ((11, 0), 0.03), ((12, 0), 0.04)]
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, *w_choice(backgrounds))
         elif colors == 1: # dirt 'wall'
           backgrounds = []
           if j > 0 and all_colors[i][j - 1] == 1: # if dirt above current position
             backgrounds = [((5, 1), 1.0)]
           else:
-            backgrounds = [((2, 0), 0.8), ((1, 0), 0.1), ((5, 1), 0.1)]
+            backgrounds = [((2, 0), 0.8), ((1, 0), 0.1), ((4, 1), 0.1)]
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, *w_choice(backgrounds))
           tile.add_group("wall")
         elif colors == 2:
@@ -562,7 +562,7 @@ class Map(Entity):
         elif colors == 5:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           #particle_sources.append([i * TILE_SIZE, j * TILE_SIZE])
-          light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.BEAM])
+          light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.RADIAL])
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -950,6 +950,8 @@ class Bullet(Entity):
 class Character(Entity):
   def __init__(self, x, y, entities):
     super(Character, self).__init__(x, y, ["renderable", "updateable", "character", "relative"], 0, 1, "tiles.png")
+    self.animticker = 0
+
     self.speed = 5
     self.vy = 0
     self.onground = False
@@ -1049,6 +1051,11 @@ class Character(Entity):
     if UpKeys.key_down(pygame.K_RIGHT):
       dx += self.speed
       self.direction = (1, 0)
+
+      if Tick.get(5): 
+        self.animticker = (self.animticker + 1) % 4
+        self.img = TileSheet.get("tiles.png", self.animticker, 3)
+
     if UpKeys.key_down(pygame.K_UP):
       self.direction = (0, -1)
     if UpKeys.key_down(pygame.K_SPACE): dy = -20
