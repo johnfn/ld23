@@ -571,6 +571,7 @@ class Map(Entity):
     self.calculate_lighting(light_sources, entities)
 
   def is_wall_rel(self, i, j):
+    if i < 0 or j < 0 or i >= MAP_SIZE_TILES or j >= MAP_SIZE_TILES: return True
     return "wall" in self.tiles[i][j].groups
 
   def calculate_lighting(self, light_sources, entities):
@@ -793,14 +794,13 @@ class LightSource(Entity):
     self.lightbeampos = []
 
     if light_type == LightSource.BEAM:
-      super(LightSource, self).__init__(x, y, ["wall", "renderable", "relative", "updateable", "map_element", "light-source"], 5, 0, "tiles.png")
+      super(LightSource, self).__init__(x, y, ["wall", "pushable", "renderable", "relative", "updateable", "map_element", "light-source"], 5, 0, "tiles.png")
     elif light_type == LightSource.RADIAL:
-      super(LightSource, self).__init__(x, y, ["wall", "renderable", "relative", "updateable", "map_element", "light-source"], 4, 2, "tiles.png")
+      super(LightSource, self).__init__(x, y, ["wall", "pushable", "renderable", "relative", "updateable", "map_element", "light-source"], 4, 2, "tiles.png")
 
     if light_type == LightSource.BEAM:
       self.beamtick = BEAM_START_LENGTH
       self.groups.append("beamlight")
-      self.groups.append("pushable")
 
     assert(self.x % TILE_SIZE == 0)
     assert(self.y % TILE_SIZE == 0)
@@ -850,6 +850,12 @@ class LightSource(Entity):
         pt[1] = pt[1] + dy
 
     return deltas
+
+  def update(self, entities):
+    m = entities.one("map")
+
+    if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1) and Tick.get(8):
+      self.y += TILE_SIZE
 
   def light_beam_pos(self):
     return self.lightbeampos
