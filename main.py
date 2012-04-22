@@ -21,6 +21,8 @@ JIGG_RANGE = 3
 
 MIN_LIGHT = 180
 
+CAM_LAG = 20
+
 #gameplay
 
 MAX_HEALTH_INC = 3
@@ -87,7 +89,7 @@ class TileSheet:
     new_sheet = spritesheet.spritesheet(file_name)
     width, height = dimensions = new_sheet.sheet.get_size()
     TileSheet.sheets[file_name] =\
-     [[new_sheet.image_at((x, y, TILE_SIZE, TILE_SIZE), colorkey=(255,255,255))\
+     [[new_sheet.image_at((x, y, TILE_SIZE, TILE_SIZE), colorkey=(1,1,1))\
        for y in range(0, height, TILE_SIZE)] for x in range(0, width, TILE_SIZE)]
 
   @staticmethod
@@ -121,11 +123,21 @@ class Entity(object):
     self.uid = get_uid()
     self.events = {}
     self.groups = groups
-    self.visible = True
+    self.visible = property(self.getvis, self.setvis)
 
     self.jiggling = 0
     self.old_xy = ()
     self.flashing = 0
+
+    self.fade_out = False
+    self.alpha = 255
+
+  def getvis(self): 
+    return self.visible
+
+  def setvis(self, val): 
+    self.visible = val
+    if self.visible: self.alpha = 255
 
   def jiggle(self):
     self.jiggling = JIGGLE_LENGTH
@@ -171,6 +183,11 @@ class Entity(object):
     for callback in self.events:
       callback()
 
+  def fadeout(self):
+    if self.visible and self.alpha == 255:
+      self.alpha = 255
+      self.fade_out = True
+
   # How high/low this object is
   # Big = on top.
   def depth(self):
@@ -197,6 +214,9 @@ class Entity(object):
     screen.blit(self.img, self.rect)
 
   def update(self, entities):
+    if self.fade_out and self.alpha > 0:
+      self.alpha -= 1
+
     if self.jiggling > 0:
       self.x = self.x + random.randrange(-JIGG_RANGE, JIGG_RANGE)
       self.y = self.y + random.randrange(-JIGG_RANGE, JIGG_RANGE)
@@ -598,6 +618,8 @@ class Bar(Entity):
     self.height = 8
     self.border_width = 2
 
+    self.img = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+
   def set_amt(self, x):
     self.amt = x
 
@@ -611,22 +633,27 @@ class Bar(Entity):
     self.x = self.follow.x
     self.y = self.follow.y
 
+    # Outer border
+    pygame.draw.rect(self.img, (0, 0, 0), (0, 0, self.width, self.height))
+
+    # Inside
+    actual_w = self.width - self.border_width * 2
+    actual_h = self.height - self.border_width * 2
+    pygame.draw.rect(self.img, self.color_no_health, (self.border_width, self.border_width, actual_w, actual_h))
+
+    # 'Health'
+    health_w = (self.amt / self.max_amt) * actual_w
+    pygame.draw.rect(self.img, self.color_health, (self.border_width, self.border_width, health_w, actual_h))
+
     super(Bar, self).update(entities)
 
   def render(self, screen, dx, dy):
     if not self.visible: return
 
-    # Outer border
-    pygame.draw.rect(screen, (0, 0, 0), (self.x + dx, self.y + dy, self.width, self.height))
+    self.img.set_alpha(self.alpha)
 
-    # Inside
-    actual_w = self.width - self.border_width * 2
-    actual_h = self.height - self.border_width * 2
-    pygame.draw.rect(screen, self.color_no_health, (self.x + self.border_width + dx, self.y + self.border_width + dy, actual_w, actual_h))
+    screen.blit(self.img, (self.x + dx, self.y + dy))
 
-    # 'Health'
-    health_w = (self.amt / self.max_amt) * actual_w
-    pygame.draw.rect(screen, self.color_health, (self.x + self.border_width + dx, self.y + self.border_width + dy, health_w, actual_h))
 
 class Reflector(Entity):
   def __init__(self, x, y, type):
@@ -962,7 +989,7 @@ class Character(Entity):
     if self.sanity < self.max_sanity:
       self.sanity_bar.visible = True
     else:
-      self.sanity_bar.visible = False
+      self.sanity_bar.fadeout()
 
     if not entities.one("all-lights").get_lighting_rel(int(self.x/20), int(self.y/20)) > INSANE_LIGHT: 
       if self.sanity < self.max_sanity:
@@ -980,14 +1007,23 @@ class Character(Entity):
 
 def render_all(manager):
   ch = manager.one("character")
-  x_ofs = max(min(ch.x, 400 - CHAR_XY), CHAR_XY)
-  y_ofs = max(min(ch.y, 400 - CHAR_XY), CHAR_XY)
+  x_ofs_actual = max(min(ch.x, 400 - CHAR_XY), CHAR_XY)
+  y_ofs_actual = max(min(ch.y, 400 - CHAR_XY), CHAR_XY)
+
+  x_ofs = render_all.old_xofs + (x_ofs_actual - render_all.old_xofs) / CAM_LAG
+  y_ofs = render_all.old_yofs + (y_ofs_actual - render_all.old_yofs) / CAM_LAG
+
+  render_all.old_xofs = x_ofs
+  render_all.old_yofs = y_ofs
 
   for e in sorted(manager.get("renderable"), key=lambda x: x.depth()):
     if "relative" in e.groups:
       e.render(screen, CHAR_XY-x_ofs, CHAR_XY-y_ofs)
     else:
       e.render(screen, 0, 0)
+
+render_all.old_xofs = 40
+render_all.old_yofs = 40
 
 def main():
   manager = Entities()
@@ -1028,7 +1064,7 @@ def main():
     for e in sorted(manager.get("updateable"), key=lambda x: x.depth()):
       e.update(manager)
 
-    screen.fill((255, 255, 255))
+    screen.fill((0, 0, 0))
 
     render_all(manager)
 
