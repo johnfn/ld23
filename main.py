@@ -285,6 +285,10 @@ class Entity(object):
           self.activate(entities)
           activated = True
 
+          #save position of the block that's pushing the switch.
+          if "persistent" in e.groups:
+            e.restore_xy = (e.x, e.y)
+
       if not activated:
         self.deactivate(entities)
 
