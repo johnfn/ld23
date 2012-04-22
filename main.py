@@ -3,6 +3,7 @@ import sys, pygame, spritesheet, wordwrap
 import random
 import numpy
 import math
+import cProfile
 from wordwrap import render_textrect
 
 WIDTH = HEIGHT = 300
@@ -723,6 +724,7 @@ class LightSource(Entity):
     super(LightSource, self).__init__(x, y, ["wall", "renderable", "relative", "updateable", "map_element", "light-source"], 5, 0, "tiles.png")
 
     if light_type == LightSource.BEAM:
+      self.beamtick = 1
       self.groups.append("beamlight")
       self.groups.append("pushable")
 
@@ -740,7 +742,7 @@ class LightSource(Entity):
     self.x = x
     self.y = y
 
-    entities.one("all-lights").recalculate_light(entities, entities.one("map"))
+    if "beamlight" in self.groups: self.beamtick = 0
 
   def calculate_light_deltas(self, entities, m):
     if self.light_type == LightSource.BEAM:
@@ -762,8 +764,8 @@ class LightSource(Entity):
       pt = [self.x, self.y]
 
       #raycast to (x, y) and light up everything along the way.
-      dx = (x - self.x) / radius
-      dy = (y - self.y) / radius
+      dx = (x - self.x) * TILE_SIZE / radius
+      dy = (y - self.y) * TILE_SIZE / radius
 
       for i in range(radius):
         if not m.in_bounds((pt[0], pt[1])): break
@@ -1079,10 +1081,14 @@ def main():
     for e in sorted(manager.get("updateable"), key=lambda x: x.depth()):
       e.update(manager)
 
+    if Tick.get(5):
+      manager.one("all-lights").recalculate_light(manager, manager.one("map"))
+
     screen.fill((0, 0, 0))
 
     render_all(manager)
 
     pygame.display.flip()
 
+#cProfile.run('main()')
 main()
