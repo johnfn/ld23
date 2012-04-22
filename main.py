@@ -10,7 +10,7 @@ WIDTH = HEIGHT = 300
 TILE_SIZE = 20
 VISIBLE_MAP_SIZE = 10
 CHAR_XY = WIDTH / 2
-GRAVITY = 2
+GRAVITY = 1
 MAP_SIZE_TILES = 20
 MAP_SIZE_PIXELS = MAP_SIZE_TILES * TILE_SIZE
 NOT_DARK = 0
@@ -1259,8 +1259,9 @@ class Character(Entity):
     super(Character, self).__init__(x, y, ["renderable", "switchpusher", "updateable", "character", "relative"], 0, 1, "tiles.png")
     self.animticker = 0
 
-    self.speed = 5
+    self.speed = 3
     self.vy = 0
+    self.vx = 0
     self.onground = False
     self.cooldown = 5
     self.direction = (1, 0)
@@ -1366,7 +1367,8 @@ class Character(Entity):
 
     if not can_update: return
 
-    dx, dy = (0, 0)
+    dx, dy = (int(self.vx/2), 0)
+    self.vx = int(self.vx/2)
 
     if UpKeys.key_down(pygame.K_x) and Tick.get(self.cooldown): self.shoot_bullet(entities)
     if UpKeys.key_down(pygame.K_LEFT):
@@ -1374,15 +1376,18 @@ class Character(Entity):
       self.direction = (-1, 0)
       if Tick.get(8): self.animticker = (self.animticker + 1) % 4
       self.img = TileSheet.get("tiles.png", self.animticker, 4)
+      self.vx = dx
+
     if UpKeys.key_down(pygame.K_RIGHT):
       dx += self.speed
       self.direction = (1, 0)
       if Tick.get(8): self.animticker = (self.animticker + 1) % 4
       self.img = TileSheet.get("tiles.png", self.animticker, 3)
+      self.vx = dx
 
     if UpKeys.key_down(pygame.K_UP):
       self.direction = (0, -1)
-    if UpKeys.key_down(pygame.K_SPACE): dy = -20
+    if UpKeys.key_down(pygame.K_SPACE) and self.onground: self.vy = 14
 
     self.vy -= GRAVITY
     dy -= self.vy
@@ -1399,6 +1404,7 @@ class Character(Entity):
       self.x -= sign(dx) or -1
 
     self.y += dy
+    self.take_pickups(entities)
     while self.collides_with_wall(entities):
       self.y -= sign(dy) or -1
 
