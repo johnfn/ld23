@@ -482,6 +482,17 @@ class Entities:
 def tupleize(color):
   return (color.r, color.g, color.b)
 
+# weighted random choice
+# takes [(item, weight), (item2, weight)], gives item.
+def w_choice(lst):
+  n = random.uniform(0, 1)
+  for item, weight in lst:
+    if n < weight:
+      break
+    n = n - weight
+  return item
+
+
 class Map(Entity):
   def __init__(self):
     self.full_map_size = MAP_SIZE_TILES
@@ -508,8 +519,8 @@ class Map(Entity):
 
     self.mapdata = TileSheet.get('laderp.bmp', self.mapx, self.mapy)
 
-    mapping = { (0, 0, 0): 1
-              , (255, 255, 255): 0
+    mapping = { (0, 0, 0): 1 # Background
+              , (255, 255, 255): 0 # Wall
               , (255, 0, 0): 2 #dumbEnemy
               , (0, 0, 255): 3 # beam light source
               , (100, 100, 100): 4 #reflector
@@ -526,7 +537,8 @@ class Map(Entity):
         colors = mapping[tupleize(self.mapdata.get_at((i, j)))]
 
         if colors == 0:
-          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          backgrounds = [((0, 0), 0.9), ((10, 0), 0.01), ((11, 0), 0.01)]
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, *w_choice(backgrounds))
         elif colors == 1:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 1, 0)
           tile.add_group("wall")
