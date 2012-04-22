@@ -917,6 +917,15 @@ class Glass(Entity):
 
   def depth(self): return 1
 
+  def update(self, entities):
+    m = entities.one("map")
+
+    if not m.get_mapxy() == self.restore_map_xy: 
+      self.visible = False
+      return
+
+    self.visible = True
+
 class Powerup(Entity):
   SANITY = 0
 
