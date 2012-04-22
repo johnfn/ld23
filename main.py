@@ -228,10 +228,11 @@ class Entity(object):
       self.flashing -= 1
 
 class Particles(Entity):
-  def __init__(self, entities, particle_sources):
-    self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
-
+  def __init__(self):
     super(Particles, self).__init__(0, 0, ["renderable", "updateable", "relative", "particles"])
+
+  def reinitialize(self, entities, particle_sources):
+    self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
     self.particles = []
     self.beams = []
     self.particle_sources = particle_sources
@@ -314,13 +315,12 @@ class LightSpot(Entity):
 
 # ALL the light in the game. ALL OF IT. Make it blurry, yo. Beacon it up in here. LOL BEACON? I DONT KNOW WHAT BEACON IS. ISNT THAT A CRISPY BREAKFAST FOOD? IVE NEVER HEARD OF IT LOL.
 class Light(Entity):
-  def __init__(self, light_objs, entities, m):
-    #TODO: constants.
+  def __init__(self):
+    super(Light, self).__init__(0, 0, ["renderable", "relative", "all-lights"])
 
+  def reinitialize(self, light_objs, entities, m):
     self.light_objs = light_objs
     self.recalculate_light(entities, m)
-
-    super(Light, self).__init__(0, 0, ["renderable", "relative", "all-lights"], 5, 0, "tiles.png")
 
   def depth(self):
     return LIGHT_DEPTH
@@ -470,8 +470,9 @@ class Map(Entity):
     mapping = { (0, 0, 0): 1
               , (255, 255, 255): 0
               , (255, 0, 0): 2 #dumbEnemy
-              , (0, 0, 255): 3 #light source
+              , (0, 0, 255): 3 # beam light source
               , (100, 100, 100): 4 #reflector
+              , (0, 0, 100): 5 # radial light source
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -494,10 +495,14 @@ class Map(Entity):
         elif colors == 3:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           particle_sources.append([i * TILE_SIZE, j * TILE_SIZE])
-          light_sources.append([i * TILE_SIZE, j * TILE_SIZE])
+          light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.BEAM])
         elif colors == 4:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           entities.add(Reflector(i * TILE_SIZE, j * TILE_SIZE, None))
+        elif colors == 5:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          #particle_sources.append([i * TILE_SIZE, j * TILE_SIZE])
+          light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.RADIAL])
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -508,25 +513,19 @@ class Map(Entity):
   def is_wall_rel(self, i, j):
     return "wall" in self.tiles[i][j].groups
 
-  def get_lighting_rel(self, i, j):
-    assert(false)
-    return self.light_deltas[i][j]
-
   def calculate_lighting(self, light_sources, entities):
     # everything starts dark.
     light_objs = []
 
     # Sources need to be aware of the entire map, so we add them last.
     for source in light_sources:
-      #TODO: Ther eis no differentiation between BEAM and RADIAL at this point.
-      new_l = LightSource(source[0], source[1], entities, self, LightSource.BEAM)
+      new_l = LightSource(source[0], source[1], entities, self, source[2])
       light_objs.append(new_l)
       entities.add(new_l)
 
     # the only things that generate particles currently are lights. thats why i pass in light_objs, not particle_objs.
-    entities.add(Particles(entities, light_objs))
-    entities.add(Light(light_objs, entities, self))
-
+    entities.one("particles").reinitialize(entities, light_objs)
+    entities.one("all-lights").reinitialize(light_objs, entities, self)
 
 class UpKeys:
   """ Simple abstraction to check for recent key released behavior. """
@@ -765,7 +764,7 @@ class LightSource(Entity):
       for i in range(radius):
         if not m.in_bounds((pt[0], pt[1])): break
         if m.is_wall_rel(int(pt[0] / 20), int(pt[1] / 20)): break
-        deltas[int(pt[0] / 20)][int(pt[1] / 20)] = self.intensity * (1 - (i + 20) / (radius + 20))
+        deltas[int(pt[0] / 20)][int(pt[1] / 20)] = self.intensity #* (1 - (i + 20) / (radius + 20))
         pt[0] = pt[0] + dx
         pt[1] = pt[1] + dy
 
@@ -1032,6 +1031,9 @@ def main():
   t = Text(c, "This is a realllllllly long text!!!!!!")
   manager.add(t)
 
+  manager.add(Light())
+  manager.add(Particles())
+
   m = Map()
   m.new_map_abs(manager, 0, 0)
   manager.add(m)
@@ -1069,6 +1071,5 @@ def main():
     render_all(manager)
 
     pygame.display.flip()
-
 
 main()
