@@ -501,6 +501,7 @@ class Map(Entity):
     self.mapy = 0
     self.visible_map_size = VISIBLE_MAP_SIZE
     self.light_deltas = None
+    self.seen_maps = []
 
     super(Map, self).__init__(0, 0, ["updateable", "map"])
 
@@ -519,6 +520,9 @@ class Map(Entity):
   def new_map_abs(self, entities, x, y):
     self.mapx = x
     self.mapy = y
+    new_map = (self.mapx, self.mapy) not in self.seen_maps
+    self.seen_maps.append((self.mapx, self.mapy))
+
     entities.remove_all("map_element")
 
     self.mapdata = TileSheet.get('laderp.bmp', self.mapx, self.mapy)
@@ -559,18 +563,22 @@ class Map(Entity):
         elif colors == 3:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           particle_sources.append([i * TILE_SIZE, j * TILE_SIZE])
-          light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.BEAM])
+          if new_map: light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.BEAM])
         elif colors == 4:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           entities.add(Reflector(i * TILE_SIZE, j * TILE_SIZE, None))
         elif colors == 5:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           #particle_sources.append([i * TILE_SIZE, j * TILE_SIZE])
-          light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.RADIAL])
+          if new_map: light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.RADIAL])
 
         tile.add_group("map_element")
         entities.add(tile)
         self.tiles[i][j] = tile
+
+    for e in entities.get("persistent"):
+      e.x = e.restore_xy[0]
+      e.y = e.restore_xy[1]
 
     self.calculate_lighting(light_sources, entities)
 
@@ -870,6 +878,8 @@ class LightSource(Entity):
     pts = []
     deltas = [[0 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
 
+    if not self.visible: return deltas
+
     for x in range(self.x - radius, self.x + radius + 1, TILE_SIZE):
       for y in range(self.y - radius, self.y + radius + 1, TILE_SIZE):
         if x == self.x - radius or x == self.x + radius or y == self.y - radius or y == self.y + radius:
@@ -901,7 +911,7 @@ class LightSource(Entity):
     self.visible = True
 
     if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1) and Tick.get(8):
-      self.move(self.x, self.y + TILE_SIZE)
+      self.move(self.x, self.y + TILE_SIZE, entities)
 
   def light_beam_pos(self):
     return self.lightbeampos
@@ -909,6 +919,8 @@ class LightSource(Entity):
   def beam_deltas(self, entities, m):
     self.lightbeampos = []
     deltas = [[0 for x in range(MAP_SIZE_TILES)] for y in range(MAP_SIZE_TILES)]
+
+    if not self.visible: return deltas
 
     pos_abs = [self.x, self.y]
     pos_rel = [int(self.x / TILE_SIZE), int(self.y / TILE_SIZE)]
