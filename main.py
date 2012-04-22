@@ -20,6 +20,8 @@ NOT_DARK = 0
 JIGGLE_LENGTH = 50
 JIGG_RANGE = 3
 
+ZOOM_SPEED = 20
+
 MIN_LIGHT = 180
 CAM_LAG = 20
 
@@ -33,6 +35,7 @@ BEAM_START_LENGTH = 5
 
 LIGHT_DEPTH = 2
 LIGHT_SOURCE_DEPTH = 5
+ENEMY_DEPTH = 8
 PARTICLE_DEPTH = 10
 BULLET_DEPTH = 50
 CHAR_DEPTH = 80
@@ -122,7 +125,7 @@ class Entity(object):
     self.size = TILE_SIZE
 
     if src_x != -1 and src_y != -1:
-      self.img = TileSheet.get(src_file, src_x, src_y)
+      self.img = TileSheet.get(src_file, src_x, src_y).copy()
       self.rect = self.img.get_rect()
 
     self.uid = get_uid()
@@ -133,16 +136,23 @@ class Entity(object):
     self.jiggling = 0
     self.old_xy = ()
     self.flashing = 0
+    self.zooming = False
+    self.zoom_pos = (0, 0)
 
     self.fade_out = False
+    self.fade_in = False
     self.alpha = 255
 
   def getvis(self): 
     return self.visible
 
   def setvis(self, val): 
+    if not self.visible and val: self.alpha = 255
     self.visible = val
-    if self.visible: self.alpha = 255
+
+  def zoom(self, position):
+    self.zooming = True
+    self.zoom_pos = position
 
   def jiggle(self):
     self.jiggling = JIGGLE_LENGTH
@@ -188,6 +198,10 @@ class Entity(object):
     for callback in self.events:
       callback()
 
+  def fadein(self):
+    self.alpha = 0
+    self.fade_in = True
+
   def fadeout(self):
     if self.visible and self.alpha == 255:
       self.alpha = 255
@@ -219,8 +233,27 @@ class Entity(object):
     screen.blit(self.img, self.rect)
 
   def update(self, entities):
+    assert(not self.fade_out or not self.fade_in)
+
+    if self.zooming:
+      if abs(self.x - self.zoom_pos[0]) + abs(self.y - self.zoom_pos[1]) > 5:
+        self.alpha = 100
+        self.x += (self.zoom_pos[0] - self.x) / ZOOM_SPEED
+        self.y += (self.zoom_pos[1] - self.y) / ZOOM_SPEED
+
+        return False
+      else:
+        self.x = self.zoom_pos[0]
+        self.y = self.zoom_pos[1]
+
+        self.alpha = 255
+        self.zooming = False
+
     if self.fade_out and self.alpha > 0:
-      self.alpha -= 1
+      self.alpha -= 5
+
+    if self.fade_in and self.alpha > 0:
+      self.alpha += 5
 
     if self.jiggling > 0:
       self.x = self.x + random.randrange(-JIGG_RANGE, JIGG_RANGE)
@@ -231,6 +264,8 @@ class Entity(object):
       #TODO: Add flashing stuff here.
 
       self.flashing -= 1
+
+    return True
 
 class Particles(Entity):
   def __init__(self):
@@ -364,7 +399,6 @@ class Light(Entity):
     for source in self.light_objs:
       if "beamlight" in source.groups:
         for beam_pos in source.light_beam_pos():
-          print beam_pos
           self.beams.append(LightBeam(beam_pos[0], beam_pos[1]))
 
     for x in range(MAP_SIZE_TILES):
@@ -610,7 +644,7 @@ class Text(Entity):
     screen.blit(rendered_text, my_rect.topleft)
 
 class Bar(Entity):
-  def __init__(self, follow, color_health, color_no_health, amt, max_amt):
+  def __init__(self, follow, color_health, color_no_health, amt, max_amt, y_ofs=0):
     super(Bar, self).__init__(follow.x, follow.y, ["renderable", "updateable", "healthbar", "relative"])
     self.amt = amt
     self.max_amt = max_amt
@@ -621,9 +655,9 @@ class Bar(Entity):
     self.width = 40
     self.height = 8
     self.border_width = 2
+    self.y_ofs = y_ofs
 
     self.img = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-
   def set_amt(self, x):
     self.amt = x
 
@@ -634,8 +668,8 @@ class Bar(Entity):
     return BAR_DEPTH
 
   def update(self, entities):
-    self.x = self.follow.x
-    self.y = self.follow.y
+    self.x = self.follow.x - self.follow.size / 2
+    self.y = self.follow.y - 10 - self.y_ofs
 
     # Outer border
     pygame.draw.rect(self.img, (0, 0, 0), (0, 0, self.width, self.height))
@@ -653,11 +687,12 @@ class Bar(Entity):
 
   def render(self, screen, dx, dy):
     if not self.visible: return
+    if self.alpha <= 0:
+      self.visible = False
 
-    self.img.set_alpha(self.alpha)
+    #self.img.set_alpha(self.alpha) #TODO WHAT IN GODS NAME?
 
     screen.blit(self.img, (self.x + dx, self.y + dy))
-
 
 class Reflector(Entity):
   def __init__(self, x, y, type):
@@ -689,6 +724,9 @@ class Enemy(Entity):
     ch = entities.one("character")
     if self.touches_rect(ch):
       ch.hurt(1)
+
+  def depth(self):
+    return ENEMY_DEPTH
 
   def die(self, entities):
     entities.remove(self)
@@ -844,7 +882,6 @@ class Bullet(Entity):
 
     if not entities.one("map").in_bounds((self.x, self.y)):
       entities.remove(self)
-      print "off"
       return
 
     hitlambda = lambda x: x.touches_point((self.x + self.size/2, self.y + self.size/2))
@@ -868,11 +905,12 @@ class Character(Entity):
     self.onground = False
     self.cooldown = 5
     self.direction = (1, 0)
+    self.last_safe_place = (x, y)
 
     self.hp = 5
     self.max_hp = 5
 
-    self.hp_bar = Bar(self, (0, 255, 0), (255, 0, 0), self.hp, self.max_hp)
+    self.hp_bar = Bar(self, (0, 255, 0), (255, 0, 0), self.hp, self.max_hp, 20)
     entities.add(self.hp_bar)
     self.hp_bar.visible = False
 
@@ -885,6 +923,7 @@ class Character(Entity):
 
   def die(self):
     print "you die!!!!!!!!!!!!!!"
+    assert(False)
 
   def hurt(self, amt):
     if self.is_flashing(): return
@@ -896,6 +935,9 @@ class Character(Entity):
 
     self.hp_bar.set_amt(self.hp)
     self.hp_bar.jiggle()
+    self.hp_bar.visible = True
+    self.hp_bar.alpha = 255
+    self.hp_bar.fadeout()
 
     self.flash()
 
@@ -941,7 +983,12 @@ class Character(Entity):
     pushblock[0].push(self.direction, entities)
 
   def update(self, entities):
-    super(Character, self).update(entities)
+    self.x = int(self.x)
+    self.y = int(self.y)
+
+    can_update = super(Character, self).update(entities)
+
+    if not can_update: return
 
     dx, dy = (0, 0)
 
@@ -988,7 +1035,8 @@ class Character(Entity):
     self.check_sanity(entities)
 
   def soft_death(self):
-    print "soft death!"
+    self.fadein()
+    self.zoom(self.last_safe_place)
 
   def depth(self):
     return CHAR_DEPTH
@@ -1004,7 +1052,10 @@ class Character(Entity):
     else:
       self.sanity_bar.fadeout()
 
+    # We're in a reasonable amount of light.
     if not entities.one("all-lights").get_lighting_rel(int(self.x/20), int(self.y/20)) > INSANE_LIGHT: 
+      self.last_safe_place = (self.x, self.y)
+
       if self.sanity < self.max_sanity:
         if Tick.get(6): 
           self.sanity += 1
