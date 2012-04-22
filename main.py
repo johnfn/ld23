@@ -25,6 +25,8 @@ ZOOM_SPEED = 20
 MIN_LIGHT = 180
 CAM_LAG = 20
 
+CROSSFADE_SPEED = 0.03
+
 #gameplay
 
 MAX_HEALTH_INC = 3
@@ -1417,12 +1419,14 @@ def main():
   while True:
     if going_insane:
       if normal_sound.get_volume() > 0.1:
-        normal_sound.set_volume(normal_sound.get_volume() - 0.05)
-        dark_sound.set_volume(dark_sound.get_volume() + 0.05)
+        normal_sound.set_volume(normal_sound.get_volume() - CROSSFADE_SPEED)
+        dark_sound.set_volume(1 - normal_sound.get_volume())
     else:
       if dark_sound.get_volume() > 0.1:
-        normal_sound.set_volume(normal_sound.get_volume() + 0.05)
-        dark_sound.set_volume(dark_sound.get_volume() - 0.05)
+        normal_sound.set_volume(normal_sound.get_volume() + CROSSFADE_SPEED)
+        dark_sound.set_volume(1 - normal_sound.get_volume())
+
+    print normal_sound.get_volume()
 
     Tick.inc()
 
