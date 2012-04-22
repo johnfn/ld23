@@ -755,7 +755,6 @@ class Pickup(Entity):
 
   def pickup(self, ch):
     ch.heal(3)
-    print "up"
 
 class Enemy(Entity):
   STRATEGY_STUPID = 0
@@ -767,6 +766,7 @@ class Enemy(Entity):
     self.speed = 3
     self.type = type
     self.hp = Enemy.hp[self.type]
+    self.ticker = 0
 
     self.direction = [1, 0]
     if self.type == Enemy.STRATEGY_STUPID:
@@ -813,7 +813,16 @@ class Enemy(Entity):
     self.y -= dir[1]
 
   def be_sentry(self, entities, ch):
-    pass
+    if Tick.get(20):
+      self.ticker += 1
+      self.img = TileSheet.get("tiles.png", 7 + self.ticker % 2, 1)
+
+    if Tick.get(20):
+      spd = 1
+      mag = math.sqrt((self.x - ch.x) ** 2 + (self.y - ch.y) ** 2)
+      direct = (spd * (ch.x - self.x) / mag, spd * (ch.y - self.y) / mag)
+      b = Bullet(self, direct, 1)
+      entities.add(b)
   
   def be_stupid(self, entities):
     self.x += self.direction[0]
@@ -989,11 +998,15 @@ class Bullet(Entity):
     self.dmg = dmg
     self.dying = False
 
+    self.char_is_owner = "character" in owner.groups
+
     if "character" in owner.groups:
       if direction[1] == 0:
         super(Bullet, self).__init__(owner.x, owner.y + random.randrange(-4, 4), ["renderable", "updateable", "bullet", "relative", "map_element"], 3, 0, "tiles.png")
       else:
         super(Bullet, self).__init__(owner.x + random.randrange(-4, 4), owner.y, ["renderable", "updateable", "bullet", "relative", "map_element"], 0, 5, "tiles.png")
+    else:
+      super(Bullet, self).__init__(owner.x, owner.y, ["renderable", "updateable", "bullet", "relative", "map_element"], 5, 2, "tiles.png") # why not 0, 15? i have no idea!
 
     self.x += int(direction[0] * owner.size / 2)
     self.y += int(direction[1] * owner.size / 2)
@@ -1034,11 +1047,18 @@ class Bullet(Entity):
       self.die()
       return
 
-    enemies_hit = entities.get("enemy", hitlambda)
-    if len(enemies_hit) > 0:
-      entities.remove(self)
-      enemies_hit[0].hurt(self.dmg, entities, self.direction)
-      return
+    if self.char_is_owner:
+      enemies_hit = entities.get("enemy", hitlambda)
+      if len(enemies_hit) > 0:
+        self.die()
+        enemies_hit[0].hurt(self.dmg, entities, self.direction)
+        return
+    else:
+      ch = entities.get("character", hitlambda)
+      if len(ch) > 0:
+        ch[0].hurt(1)
+        self.die()
+        return
 
 class Character(Entity):
   def __init__(self, x, y, entities):
