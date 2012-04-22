@@ -48,8 +48,9 @@ BAR_DEPTH = 200
 #hax
 
 cam_lag_override = 0
+going_insane = False
 
-DEBUG = True
+DEBUG = False
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -1336,6 +1337,9 @@ class Character(Entity):
 
     # We're in a reasonable amount of light.
     if not entities.one("all-lights").get_lighting_rel(int(self.x/20), int(self.y/20)) > INSANE_LIGHT: 
+      global going_insane
+      going_insane = False
+
       self.last_safe_place = (self.x, self.y)
 
       if self.sanity < self.max_sanity:
@@ -1343,6 +1347,9 @@ class Character(Entity):
           self.sanity += 1
           self.sanity_bar.jiggling = 0
       return
+
+    global going_insane
+    going_insane = True
 
     if Tick.get(20): 
       self.sanity -= 1
@@ -1393,12 +1400,30 @@ def main():
   pygame.display.init()
   pygame.font.init()
 
+  normal_sound = None
+  dark_sound = None
+
   if not DEBUG:
     pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024)
-    pygame.mixer.music.load('ludumherp.mp3')
-    pygame.mixer.music.play(-1) #Infinite loop! HAHAH!
+
+    normal_sound = pygame.mixer.Sound('soundtrack-normal.ogg')
+    dark_sound   = pygame.mixer.Sound('soundtrack-dark.ogg')
+
+    normal_sound.play(-1)
+
+    dark_sound.play(-1)
+    dark_sound.set_volume(0.0)
 
   while True:
+    if going_insane:
+      if normal_sound.get_volume() > 0.1:
+        normal_sound.set_volume(normal_sound.get_volume() - 0.05)
+        dark_sound.set_volume(dark_sound.get_volume() + 0.05)
+    else:
+      if dark_sound.get_volume() > 0.1:
+        normal_sound.set_volume(normal_sound.get_volume() + 0.05)
+        dark_sound.set_volume(dark_sound.get_volume() - 0.05)
+
     Tick.inc()
 
     for event in pygame.event.get():
