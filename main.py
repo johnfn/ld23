@@ -675,8 +675,13 @@ class Map(Entity):
         self.tiles[i][j] = tile
 
     for e in entities.get("persistent"):
-      e.x = e.restore_xy[0]
-      e.y = e.restore_xy[1]
+      if self.get_mapxy() == e.restore_map_xy:
+        e.x = e.restore_xy[0]
+        e.y = e.restore_xy[1]
+        if "wall" not in e.groups: e.add_group("wall")
+      else:
+        if "wall" in e.groups:
+          e.groups.remove("wall")
 
     self.calculate_lighting(light_sources, entities)
 
@@ -1435,7 +1440,7 @@ def main():
   manager.add(Particles())
 
   m = Map()
-  m.new_map_abs(manager, 6, 0)
+  m.new_map_abs(manager, 0, 0)
   manager.add(m)
 
   pygame.display.init()
