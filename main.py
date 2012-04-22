@@ -97,7 +97,7 @@ class TileSheet:
     new_sheet = spritesheet.spritesheet(file_name)
     width, height = dimensions = new_sheet.sheet.get_size()
     TileSheet.sheets[file_name] =\
-     [[new_sheet.image_at((x, y, TILE_SIZE, TILE_SIZE), colorkey=(1,1,1))\
+     [[new_sheet.image_at((x, y, TILE_SIZE, TILE_SIZE), colorkey=(254,254,254))\
        for y in range(0, height, TILE_SIZE)] for x in range(0, width, TILE_SIZE)]
 
   @staticmethod
@@ -279,6 +279,8 @@ class Particles(Entity):
     self.tick = 0
 
   def update(self, entities):
+    return
+
     self.tick += 1
     self.surf = pygame.Surface((MAP_SIZE_PIXELS, MAP_SIZE_PIXELS), pygame.SRCALPHA) #TODO: make actual map size.
 
@@ -899,7 +901,7 @@ class Bullet(Entity):
 
 class Character(Entity):
   def __init__(self, x, y, entities):
-    super(Character, self).__init__(x, y, ["renderable", "updateable", "character", "relative"], 0, 1, "tiles.bmp")
+    super(Character, self).__init__(x, y, ["renderable", "updateable", "character", "relative"], 0, 1, "tiles.png")
     self.speed = 5
     self.vy = 0
     self.onground = False
