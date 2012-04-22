@@ -609,6 +609,7 @@ class Map(Entity):
               , (0, 100, 0): 11 # lock-box
               , (0, 0, 200): 12 # beam light source, left
               , (255, 255, 0): 13 # glass
+              , (255, 128, 0): 14 # +1 sanity
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -673,6 +674,9 @@ class Map(Entity):
         elif colors == 13:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           entities.add(Glass(i * TILE_SIZE, j * TILE_SIZE))
+        elif colors == 14:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          if new_map: entities.add(Powerup(i * TILE_SIZE, j * TILE_SIZE, Powerup.SANITY, self))
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -913,12 +917,39 @@ class Glass(Entity):
 
   def depth(self): return 1
 
+class Powerup(Entity):
+  SANITY = 0
+
+  def __init__(self, x, y, type, m):
+    if type == Powerup.SANITY:
+      super(Powerup, self).__init__(x, y, ["renderable", "wall", "persistent", "pickupable", "updateable", "relative"], 14, 1, "tiles.png")
+    else:
+      assert(False)
+
+    self.restore_xy = (self.x, self.y)
+    self.restore_map_xy = m.get_mapxy()
+
+  def pickup(self, ch):
+    ch.max_sanity += 2
+    ch.sanity = ch.max_sanity
+
+  def depth(self): return 2
+
+  def update(self, entities):
+    m = entities.one("map")
+
+    if not m.get_mapxy() == self.restore_map_xy: 
+      self.visible = False
+      return
+
+    self.visible = True
+
 class Pickup(Entity):
   HEALTH = 0
 
   def __init__(self, x, y, type):
     if type == Pickup.HEALTH:
-      super(Pickup, self).__init__(x, y, ["renderable", "pickupable", "updateable", "relative"], 13, 0, "tiles.png")
+      super(Pickup, self).__init__(x, y, ["renderable", "pickupable", "attractable", "updateable", "relative"], 13, 0, "tiles.png")
     else:
       assert(False)
 
@@ -1315,20 +1346,23 @@ class Character(Entity):
 
   def take_pickups(self, entities):
     for item in entities.get("pickupable"):
+      # hack to determine if the powerup is on the same level as you are
+      if "persistent" in item.groups and "wall" not in item.groups: 
+        continue
+
       if item.touches_rect(self):
         item.pickup(self)
         entities.remove(item)
       else:
-        item.x += (self.x - item.x) / ITEM_DRIFT_SPEED
-        item.y += (self.y - item.y) / ITEM_DRIFT_SPEED
+        if "attractable" in item.groups:
+          item.x += (self.x - item.x) / ITEM_DRIFT_SPEED
+          item.y += (self.y - item.y) / ITEM_DRIFT_SPEED
 
   def update(self, entities):
     self.x = int(self.x)
     self.y = int(self.y)
 
     can_update = super(Character, self).update(entities)
-
-    self.take_pickups(entities)
 
     if not can_update: return
 
@@ -1360,6 +1394,7 @@ class Character(Entity):
 
     self.x += dx
     self.check_for_push(entities)
+    self.take_pickups(entities)
     while self.collides_with_wall(entities):
       self.x -= sign(dx) or -1
 
