@@ -532,15 +532,22 @@ class Map(Entity):
     particle_sources = []
     light_sources = []
 
+    all_colors = [[mapping[tupleize(self.mapdata.get_at((i, j)))] for j in range(MAP_SIZE_TILES)] for i in range(MAP_SIZE_TILES)]
+
     for i in range(MAP_SIZE_TILES):
       for j in range(MAP_SIZE_TILES):
-        colors = mapping[tupleize(self.mapdata.get_at((i, j)))]
+        colors = all_colors[i][j]
 
         if colors == 0:
-          backgrounds = [((0, 0), 0.9), ((10, 0), 0.01), ((11, 0), 0.01)]
+          backgrounds = [((0, 0), 0.9), ((10, 0), 0.003), ((11, 0), 0.003)]
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, *w_choice(backgrounds))
-        elif colors == 1:
-          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 1, 0)
+        elif colors == 1: # dirt 'wall'
+          backgrounds = []
+          if j > 0 and all_colors[i][j - 1] == 1: # if dirt above current position
+            backgrounds = [((5, 1), 1.0)]
+          else:
+            backgrounds = [((2, 0), 0.8), ((1, 0), 0.1), ((5, 1), 0.1)]
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, *w_choice(backgrounds))
           tile.add_group("wall")
         elif colors == 2:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
