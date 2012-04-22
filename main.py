@@ -654,7 +654,7 @@ class Map(Entity):
           if new_map: entities.add(PushBlock(i * TILE_SIZE, j * TILE_SIZE, self))
         elif colors == 10:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
-          entities.add(Switch(i * TILE_SIZE, j * TILE_SIZE))
+          entities.add(Switch(i * TILE_SIZE, j * TILE_SIZE, self))
         elif colors == 11:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 7, 2)
           tile.add_group("lock")
@@ -826,12 +826,31 @@ class PushBlock(Entity):
   def depth(self):
     return PUSH_BLOCK_DEPTH
 
+  def update(self, entities):
+    if not entities.one("map").get_mapxy() == self.restore_map_xy: 
+      self.visible = False
+      return
+
+    self.visible = True
+
+    super(PushBlock, self).update(entities)
+
 class Switch(Entity):
-  def __init__(self, x, y):
+  def __init__(self, x, y, m):
     super(Switch, self).__init__(x, y, ["renderable", "updateable", "switch", "relative"], 4, 3, "tiles.png")
+    self.restore_map_xy = m.get_mapxy()
 
   def depth(self):
     return SWITCH_DEPTH
+
+  def update(self, entities):
+    if not entities.one("map").get_mapxy() == self.restore_map_xy: 
+      self.visible = False
+      return
+
+    self.visible = True
+
+    super(Switch, self).update(entities)
 
   def activate(self, entities):
     for e in entities.get("lock"):
