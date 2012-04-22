@@ -608,6 +608,7 @@ class Map(Entity):
               , (0, 255, 0): 10 # switch
               , (0, 100, 0): 11 # lock-box
               , (0, 0, 200): 12 # beam light source, left
+              , (255, 255, 0): 13 # glass
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -669,6 +670,9 @@ class Map(Entity):
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           particle_sources.append([i * TILE_SIZE, j * TILE_SIZE])
           if new_map: light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.BEAM_LEFT])
+        elif colors == 13:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          entities.add(Glass(i * TILE_SIZE, j * TILE_SIZE))
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -687,6 +691,12 @@ class Map(Entity):
 
   def is_wall_rel(self, i, j):
     if i < 0 or j < 0 or i >= MAP_SIZE_TILES or j >= MAP_SIZE_TILES: return False
+    return "wall" in self.tiles[i][j].groups
+
+  def is_opaq_rel(self, i, j):
+    if i < 0 or j < 0 or i >= MAP_SIZE_TILES or j >= MAP_SIZE_TILES: return False
+
+    if "glass" in self.tiles[i][j].groups: return False
     return "wall" in self.tiles[i][j].groups
 
   def calculate_lighting(self, light_sources, entities):
@@ -894,6 +904,14 @@ class Reflector(Entity):
 
   def reflect(self, direction):
     return [direction[1], -direction[0]]
+  
+  def depth(self): return 1
+
+class Glass(Entity):
+  def __init__(self, x, y):
+    super(Glass, self).__init__(x, y, ["renderable", "wall", "glass", "relative"], 1, 1, "tiles.png")
+
+  def depth(self): return 1
 
 class Pickup(Entity):
   HEALTH = 0
@@ -1066,7 +1084,7 @@ class LightSource(Entity):
 
       for i in range(radius):
         if not m.in_bounds((pt[0], pt[1])): break
-        if m.is_wall_rel(int(pt[0] / 20), int(pt[1] / 20)): break
+        if m.is_opaq_rel(int(pt[0] / 20), int(pt[1] / 20)): break
         deltas[int(pt[0] / 20)][int(pt[1] / 20)] = self.intensity #* (1 - (i + 20) / (radius + 20))
         pt[0] = pt[0] + dx
         pt[1] = pt[1] + dy
@@ -1099,7 +1117,7 @@ class LightSource(Entity):
     cur_dir = self.direction
 
     length = 0
-    while m.in_bounds(pos_abs) and not entities.any("wall", lambda e: e.x == pos_abs[0] and e.y == pos_abs[1] and e.uid != self.uid):
+    while m.in_bounds(pos_abs) and not m.is_opaq_rel(pos_rel[0], pos_rel[1]):
       length += 1
       if length > self.beamtick: break
       # bugginess of this line approaches 1...
@@ -1440,7 +1458,7 @@ def main():
   manager.add(Particles())
 
   m = Map()
-  m.new_map_abs(manager, 0, 0)
+  m.new_map_abs(manager, 5, 1)
   manager.add(m)
 
   pygame.display.init()
