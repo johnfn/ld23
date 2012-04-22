@@ -733,10 +733,22 @@ class Enemy(Entity):
   def die(self, entities):
     entities.remove(self)
 
-  def hurt(self, amt, entities):
+  def hurt(self, amt, entities, dir):
     self.hp -= 1
     if self.hp <= 0:
       self.die(entities)
+    else:
+      self.knockback(5, entities, (sign(dir[0]), sign(dir[1])))
+
+  def knockback(self, dist, entities, dir):
+    while not self.collides_with_wall(entities) and dist > 0:
+      dist -= 1
+      self.x += dir[0]
+      self.y += dir[1]
+
+    self.x -= dir[0]
+    self.y -= dir[1]
+
 
   def be_stupid(self, entities):
     self.x += self.direction[0]
@@ -913,7 +925,7 @@ class Bullet(Entity):
     enemies_hit = entities.get("enemy", hitlambda)
     if len(enemies_hit) > 0:
       entities.remove(self)
-      enemies_hit[0].hurt(self.dmg, entities)
+      enemies_hit[0].hurt(self.dmg, entities, self.direction)
       return
 
 class Character(Entity):
