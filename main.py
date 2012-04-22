@@ -504,6 +504,9 @@ class Map(Entity):
 
     super(Map, self).__init__(0, 0, ["updateable", "map"])
 
+  def get_mapxy(self):
+    return (self.mapx, self.mapy)
+
   def update(self, entities):
     super(Map, self).update(entities)
 
@@ -810,9 +813,12 @@ class LightSource(Entity):
     self.lightbeampos = []
 
     if light_type == LightSource.BEAM:
-      super(LightSource, self).__init__(x, y, ["wall", "pushable", "renderable", "relative", "updateable", "map_element", "light-source"], 5, 0, "tiles.png")
+      super(LightSource, self).__init__(x, y, ["wall", "pushable", "renderable", "relative", "updateable", "persistent", "light-source"], 5, 0, "tiles.png")
     elif light_type == LightSource.RADIAL:
-      super(LightSource, self).__init__(x, y, ["wall", "pushable", "renderable", "relative", "updateable", "map_element", "light-source"], 4, 2, "tiles.png")
+      super(LightSource, self).__init__(x, y, ["wall", "pushable", "renderable", "relative", "updateable", "persistent", "light-source"], 4, 2, "tiles.png")
+
+    self.restore_xy = (self.x, self.y)
+    self.restore_map_xy = m.get_mapxy()
 
     if light_type == LightSource.BEAM:
       self.beamtick = BEAM_START_LENGTH
@@ -831,6 +837,24 @@ class LightSource(Entity):
   def move(self, x, y, entities):
     self.x = x
     self.y = y
+
+    went_offscreen = False
+
+    if self.x < 0: 
+      self.x = MAP_SIZE_PIXELS - TILE_SIZE * 2
+      self.restore_map_xy = (self.restore_map_xy[0] - 1, self.restore_map_xy[1])
+      went_offscreen = True
+    elif self.x > MAP_SIZE_PIXELS:
+      self.x = TILE_SIZE * 2
+      self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
+      went_offscreen = True
+    elif self.y > MAP_SIZE_PIXELS:
+      self.y = TILE_SIZE * 2
+      self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
+      went_offscreen = True
+
+    if went_offscreen:
+      self.restore_xy = (self.x, self.y)
 
     if "beamlight" in self.groups: self.beamtick = BEAM_START_LENGTH
 
@@ -870,8 +894,14 @@ class LightSource(Entity):
   def update(self, entities):
     m = entities.one("map")
 
+    if not m.get_mapxy() == self.restore_map_xy: 
+      self.visible = False
+      return
+
+    self.visible = True
+
     if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1) and Tick.get(8):
-      self.y += TILE_SIZE
+      self.move(self.x, self.y + TILE_SIZE)
 
   def light_beam_pos(self):
     return self.lightbeampos
