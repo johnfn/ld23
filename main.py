@@ -38,6 +38,10 @@ CHAR_DEPTH = 80
 TEXT_DEPTH = 100
 BAR_DEPTH = 200
 
+#hax
+
+cam_lag_override = 0
+
 DEBUG = True
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -916,6 +920,10 @@ class Character(Entity):
       self.x -= (MAP_SIZE_PIXELS - TILE_SIZE) * d[0]
       self.y -= (MAP_SIZE_PIXELS - TILE_SIZE) * d[1]
 
+      # Force instant camera update.
+      global cam_lag_override
+      cam_lag_override = 1
+
   def shoot_bullet(self, entities):
     b = Bullet(self, self.direction, 1)
     entities.add(b)
@@ -1004,13 +1012,18 @@ class Character(Entity):
     if self.sanity <= 0:
       self.soft_death()
 
-def render_all(manager):
+def render_all(manager, lag = CAM_LAG):
+  global cam_lag_override
+  if cam_lag_override != 0:
+    lag = cam_lag_override
+    cam_lag_override = 0
+
   ch = manager.one("character")
   x_ofs_actual = max(min(ch.x, 400 - CHAR_XY), CHAR_XY)
   y_ofs_actual = max(min(ch.y, 400 - CHAR_XY), CHAR_XY)
 
-  x_ofs = render_all.old_xofs + (x_ofs_actual - render_all.old_xofs) / CAM_LAG
-  y_ofs = render_all.old_yofs + (y_ofs_actual - render_all.old_yofs) / CAM_LAG
+  x_ofs = render_all.old_xofs + (x_ofs_actual - render_all.old_xofs) / lag
+  y_ofs = render_all.old_yofs + (y_ofs_actual - render_all.old_yofs) / lag
 
   render_all.old_xofs = x_ofs
   render_all.old_yofs = y_ofs
