@@ -871,26 +871,43 @@ class Bullet(Entity):
     self.direction = direction
     self.owner = owner
     self.dmg = dmg
-    super(Bullet, self).__init__(owner.x, owner.y, ["renderable", "updateable", "bullet", "relative", "map_element"], 3, 0, "tiles.png")
+    self.dying = False
+    super(Bullet, self).__init__(owner.x, owner.y + random.randrange(-4, 4), ["renderable", "updateable", "bullet", "relative", "map_element"], 3, 0, "tiles.png")
 
   def depth(self):
     return BULLET_DEPTH
 
+  def die(self):
+    self.dying = True
+    self.ticks = 0
+
+  def death_anim(self, entities):
+    if Tick.get(5):
+      self.ticks += 1
+      if self.ticks == 3:
+        entities.remove(self)
+      else:
+        self.img = TileSheet.get("tiles.png", 3, self.ticks)
+
   def update(self, entities):
+    if self.dying:
+      self.death_anim(entities)
+      return
+
     super(Bullet, self).update(entities)
 
     self.x += self.direction[0] * self.speed
     self.y += self.direction[1] * self.speed
 
     if not entities.one("map").in_bounds((self.x, self.y)):
-      entities.remove(self)
+      self.die()
       return
 
     hitlambda = lambda x: x.touches_point((self.x + self.size/2, self.y + self.size/2))
 
     walls_hit = entities.get("wall", hitlambda)
     if len(walls_hit) > 0:
-      entities.remove(self)
+      self.die()
       return
 
     enemies_hit = entities.get("enemy", hitlambda)
