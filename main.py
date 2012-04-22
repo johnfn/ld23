@@ -30,6 +30,7 @@ CAM_LAG = 20
 MAX_HEALTH_INC = 3
 INSANE_LIGHT = 150
 BEAM_START_LENGTH = 5
+ITEM_DRIFT_SPEED = 20
 
 #depths
 
@@ -929,6 +930,9 @@ class Bullet(Entity):
     self.dying = False
     super(Bullet, self).__init__(owner.x, owner.y + random.randrange(-4, 4), ["renderable", "updateable", "bullet", "relative", "map_element"], 3, 0, "tiles.png")
 
+    self.x += int(direction[0] * owner.size / 2)
+    self.y += int(direction[1] * owner.size / 2)
+
   def depth(self):
     return BULLET_DEPTH
 
@@ -1062,9 +1066,13 @@ class Character(Entity):
     pushblock[0].push(self.direction, entities)
 
   def take_pickups(self, entities):
-    for item in entities.get("pickupable", lambda p: p.touches_rect(self)):
-      item.pickup(self)
-      entities.remove(item)
+    for item in entities.get("pickupable"):
+      if item.touches_rect(self):
+        item.pickup(self)
+        entities.remove(item)
+      else:
+        item.x += (self.x - item.x) / ITEM_DRIFT_SPEED
+        item.y += (self.y - item.y) / ITEM_DRIFT_SPEED
 
   def update(self, entities):
     self.x = int(self.x)
@@ -1082,13 +1090,13 @@ class Character(Entity):
     if UpKeys.key_down(pygame.K_LEFT):
       dx -= self.speed
       self.direction = (-1, 0)
+      if Tick.get(8): self.animticker = (self.animticker + 1) % 4
+      self.img = TileSheet.get("tiles.png", self.animticker, 4)
     if UpKeys.key_down(pygame.K_RIGHT):
       dx += self.speed
       self.direction = (1, 0)
-
-      if Tick.get(8): 
-        self.animticker = (self.animticker + 1) % 4
-        self.img = TileSheet.get("tiles.png", self.animticker, 3)
+      if Tick.get(8): self.animticker = (self.animticker + 1) % 4
+      self.img = TileSheet.get("tiles.png", self.animticker, 3)
 
     if UpKeys.key_down(pygame.K_UP):
       self.direction = (0, -1)
