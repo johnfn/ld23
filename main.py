@@ -593,7 +593,7 @@ class Map(Entity):
     mapping = { (0, 0, 0): 1 # Background
               , (255, 255, 255): 0 # Wall
               , (255, 0, 0): 2 #dumbEnemy
-              , (0, 0, 100): 3 # beam light source
+              , (0, 0, 100): 3 # beam light source, right.
               , (100, 100, 100): 4 #reflector
               , (0, 0, 255): 5 # radial light source
               , (200, 0, 0): 6 # sentry
@@ -602,6 +602,7 @@ class Map(Entity):
               , (222, 222, 222): 9 # push-crate
               , (0, 255, 0): 10 # switch
               , (0, 100, 0): 11 # lock-box
+              , (0, 0, 200): 12 # beam light source, left
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -659,6 +660,10 @@ class Map(Entity):
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 7, 2)
           tile.add_group("lock")
           tile.add_group("wall")
+        elif colors == 12:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          particle_sources.append([i * TILE_SIZE, j * TILE_SIZE])
+          if new_map: light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.BEAM_LEFT])
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -986,14 +991,19 @@ class Enemy(Entity):
 class LightSource(Entity):
   BEAM = 0
   RADIAL = 1
+  BEAM_LEFT = 2
 
   def __init__(self, x, y, entities, m, light_type, dir=None):
-    if dir is None:
-      self.direction = (1, 0)
-    else:
-      self.direction = dir
+    if light_type != LightSource.RADIAL and dir is None:
+      if light_type == LightSource.BEAM:
+        self.direction = (1, 0)
+      else:
+        self.direction = (-1, 0)
+
+    if light_type == LightSource.BEAM_LEFT: light_type = LightSource.BEAM
 
     self.light_type = light_type
+
     self.intensity = -255
     self.falloff = 60
     self.lightbeampos = []
@@ -1415,7 +1425,7 @@ def main():
   manager.add(Particles())
 
   m = Map()
-  m.new_map_abs(manager, 0, 0)
+  m.new_map_abs(manager, 2, 0)
   manager.add(m)
 
   pygame.display.init()
@@ -1445,8 +1455,6 @@ def main():
         normal_sound.set_volume(normal_sound.get_volume() + CROSSFADE_SPEED)
         dark_sound.set_volume(1 - normal_sound.get_volume())
 
-    print normal_sound.get_volume()
-
     Tick.inc()
 
     for event in pygame.event.get():
@@ -1466,7 +1474,7 @@ def main():
     for e in sorted(manager.get("updateable"), key=lambda x: x.depth()):
       e.update(manager)
 
-    if Tick.get(5):
+    if Tick.get(10):
       manager.one("all-lights").recalculate_light(manager, manager.one("map"))
 
     screen.fill((0, 0, 0))
