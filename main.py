@@ -792,7 +792,10 @@ class LightSource(Entity):
     self.falloff = 60
     self.lightbeampos = []
 
-    super(LightSource, self).__init__(x, y, ["wall", "renderable", "relative", "updateable", "map_element", "light-source"], 5, 0, "tiles.png")
+    if light_type == LightSource.BEAM:
+      super(LightSource, self).__init__(x, y, ["wall", "renderable", "relative", "updateable", "map_element", "light-source"], 5, 0, "tiles.png")
+    elif light_type == LightSource.RADIAL:
+      super(LightSource, self).__init__(x, y, ["wall", "renderable", "relative", "updateable", "map_element", "light-source"], 4, 2, "tiles.png")
 
     if light_type == LightSource.BEAM:
       self.beamtick = BEAM_START_LENGTH
