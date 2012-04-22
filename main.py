@@ -536,6 +536,7 @@ class Map(Entity):
               , (200, 0, 0): 6 # sentry
               , (50, 0, 0): 7 # science-wall
               , (100, 0, 0): 8 # sweeper
+              , (222, 222, 222): 9 # push-crate
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -583,7 +584,9 @@ class Map(Entity):
         elif colors == 8:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           entities.add(Enemy(i * TILE_SIZE, j * TILE_SIZE, Enemy.STRATEGY_SWEEPER))
-          print "sweep"
+        elif colors == 9:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          entities.add(PushBlock(i * TILE_SIZE, j * TILE_SIZE, self))
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -741,6 +744,46 @@ class Bar(Entity):
 
     screen.blit(self.img, (self.x + dx, self.y + dy))
 
+class PushBlock(Entity):
+  def __init__(self, x, y, m):
+    self.direction = [1, 0]
+    super(PushBlock, self).__init__(x, y, ["renderable", "persistent", "wall", "pushable", "relative"], 6, 2, "tiles.png")
+    self.restore_xy = (self.x, self.y)
+    self.restore_map_xy = m.get_mapxy()
+
+  def push(self, direction, entities):
+    new_x = self.x + direction[0] * TILE_SIZE
+    new_y = self.y + direction[1] * TILE_SIZE
+
+    if entities.any("wall", lambda e: e.x == new_x and e.y == new_y): return
+    self.move(new_x, new_y, entities)
+
+  def depth(self):
+    return 2
+
+  def move(self, x, y, entities):
+    self.x = x
+    self.y = y
+
+    went_offscreen = False
+
+    if self.x < 0: 
+      self.x = MAP_SIZE_PIXELS - TILE_SIZE * 2
+      self.restore_map_xy = (self.restore_map_xy[0] - 1, self.restore_map_xy[1])
+      went_offscreen = True
+    elif self.x > MAP_SIZE_PIXELS:
+      self.x = TILE_SIZE * 2
+      self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
+      went_offscreen = True
+    elif self.y > MAP_SIZE_PIXELS:
+      self.y = TILE_SIZE * 2
+      self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
+      went_offscreen = True
+
+    if went_offscreen:
+      self.restore_xy = (self.x, self.y)
+
+    if "beamlight" in self.groups: self.beamtick = BEAM_START_LENGTH
 class Reflector(Entity):
   def __init__(self, x, y, type):
     self.direction = [1, 0]
