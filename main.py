@@ -59,7 +59,7 @@ shoot_sound = None
 cam_lag_override = 0
 going_insane = False
 
-DEBUG = False
+DEBUG = True
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -616,6 +616,7 @@ class Map(Entity):
               , (0, 0, 200): 12 # beam light source, left
               , (255, 255, 0): 13 # glass
               , (255, 128, 0): 14 # +1 sanity
+              , (111, 111, 111): 15 # Dialog
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -685,6 +686,10 @@ class Map(Entity):
         elif colors == 14:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           if new_map: entities.add(Powerup(i * TILE_SIZE, j * TILE_SIZE, Powerup.SANITY, self))
+        elif colors == 15:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          if self.get_mapxy() not in Dialog.SEEN:
+            entities.add(Dialog(i * TILE_SIZE, j * TILE_SIZE, self.get_mapxy()))
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -766,13 +771,14 @@ def sign(a):
   return 0
 
 class Text(Entity):
-  def __init__(self, follow, contents):
+  def __init__(self, follow, contents, colored=False):
     UpKeys.invalidate_key(pygame.K_z)
-    super(Text, self).__init__(follow.x, follow.y, ["renderable", "text", "updateable", "relative"])
+    super(Text, self).__init__(follow.x, follow.y, ["renderable", "text", "updateable", "relative", "map_element"])
     self.contents = contents
     self.follow = follow
     self.shown_chars = 1
     self.tot_chars = len(contents)
+    self.colored = colored
 
   def depth(self):
     return TEXT_DEPTH
@@ -791,14 +797,16 @@ class Text(Entity):
   def render(self, screen, dx, dy):
     if not self.visible: return
 
-    my_width = 100
+    my_width = 300
     my_font = pygame.font.Font("nokiafc22.ttf", 12)
     vis_text = self.contents[:self.shown_chars]
 
-    my_rect = pygame.Rect((self.follow.x + dx - my_width / 2, self.follow.y + dy - len(vis_text) - 30, my_width, 70))
-    if my_rect.x < 0:
-      my_rect.x = 0
-    rendered_text = render_textrect(vis_text, my_font, my_rect, (10, 10, 10), (255, 255, 255), False, 1)
+    my_rect = pygame.Rect((self.follow.x + dx - my_width / 2, self.follow.y + dy - len(vis_text) - 30, my_width, 150))
+    my_rect.x = 0
+    my_rect.y = 50
+
+    color = (255,0,0) if self.colored else (10,10,10)
+    rendered_text = render_textrect(vis_text, my_font, my_rect, color, (255, 255, 255), False, 1)
 
     screen.blit(rendered_text, my_rect.topleft)
 
@@ -918,6 +926,26 @@ class Reflector(Entity):
     return [direction[1], -direction[0]]
   
   def depth(self): return 1
+
+class Dialog(Entity):
+  DIALOGS = { (0, 0): "Hmm. The ball shoots light in all directions." 
+            , (1, 0): "The darkness will drive you mad if you stay in it too long. The white bar represents your sanity.\n\nJump with space."
+            , (2, 0): "And these are directional lights. More powerful, but they only fire in a single direction."
+            , (3, 0): "Fire your trusty gun with the X key."
+            }
+  REDS = { (1, 0): True }
+  SEEN = {}
+
+  def __init__(self, x, y, loc):
+    super(Dialog, self).__init__(x, y, ["renderable", "dialog", "relative"], 0, 0, "tiles.png")
+    self.loc = loc
+
+  def colored(self):
+    return self.loc in Dialog.REDS
+
+  def read(self):
+    Dialog.SEEN[self.loc] = True
+    return Dialog.DIALOGS[self.loc]
 
 class Glass(Entity):
   def __init__(self, x, y):
@@ -1048,6 +1076,7 @@ class Enemy(Entity):
     if Tick.get(20):
       spd = 1
       mag = math.sqrt((self.x - ch.x) ** 2 + (self.y - ch.y) ** 2)
+      if mag == 0: return
       direct = (spd * (ch.x - self.x) / mag, spd * (ch.y - self.y) / mag)
       b = Bullet(self, direct, 1)
       if not DEBUG: shoot_sound.play()
@@ -1369,6 +1398,12 @@ class Character(Entity):
           item.x += (self.x - item.x) / ITEM_DRIFT_SPEED
           item.y += (self.y - item.y) / ITEM_DRIFT_SPEED
 
+  def check_dialog(self, entities):
+    d = entities.get("dialog", lambda e: e.touches_rect(self))
+    if len(d) > 0:
+      entities.add(Text(self, d[0].read(), d[0].colored()))
+      entities.remove(d[0])
+
   def update(self, entities):
     self.x = int(self.x)
     self.y = int(self.y)
@@ -1376,6 +1411,8 @@ class Character(Entity):
     can_update = super(Character, self).update(entities)
 
     if not can_update: return
+
+    self.check_dialog(entities)
 
     dx, dy = (int(self.vx/2), 0)
     self.vx = int(self.vx/2)
@@ -1509,14 +1546,12 @@ def main():
   manager = Entities()
   c = Character(40, 40, manager)
   manager.add(c)
-  t = Text(c, "This is a realllllllly long text!!!!!!")
-  manager.add(t)
 
   manager.add(Light())
   manager.add(Particles())
 
   m = Map()
-  m.new_map_abs(manager, 3, 1)
+  m.new_map_abs(manager, 0, 0)
   manager.add(m)
 
   pygame.display.init()
