@@ -1052,7 +1052,7 @@ class Character(Entity):
       dx += self.speed
       self.direction = (1, 0)
 
-      if Tick.get(5): 
+      if Tick.get(8): 
         self.animticker = (self.animticker + 1) % 4
         self.img = TileSheet.get("tiles.png", self.animticker, 3)
 
