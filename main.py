@@ -152,17 +152,13 @@ class Entity(object):
 
   def push(self, direction, entities):
     assert "pushable" in self.groups
+    direction = (direction[0], 0)
+
     new_x = self.x + direction[0] * TILE_SIZE
     new_y = self.y + direction[1] * TILE_SIZE
 
     if entities.any("wall", lambda e: e.x == new_x and e.y == new_y): return
     self.move(new_x, new_y, entities)
-
-    switch = entities.one("switch")
-    if switch.touches_rect(self):
-      switch.activate(entities)
-    else:
-      switch.deactivate(entities)
 
   def move(self, x, y, entities):
     self.x = x
@@ -280,6 +276,17 @@ class Entity(object):
 
   def update(self, entities):
     assert(not self.fade_out or not self.fade_in)
+
+    if "switch" in self.groups:
+      activated = False
+
+      for e in entities.get("switchpusher"):
+        if e.touches_rect(self):
+          self.activate(entities)
+          activated = True
+
+      if not activated:
+        self.deactivate(entities)
 
     if len(self.anim) > 0 and Tick.get(8):
       self.img = TileSheet.get("tiles.png", *self.anim.pop(0))
@@ -805,7 +812,7 @@ class Bar(Entity):
 class PushBlock(Entity):
   def __init__(self, x, y, m):
     self.direction = [1, 0]
-    super(PushBlock, self).__init__(x, y, ["renderable", "switchpusher", "persistent", "wall", "pushable", "relative"], 6, 2, "tiles.png")
+    super(PushBlock, self).__init__(x, y, ["renderable", "updateable", "switchpusher", "persistent", "wall", "pushable", "relative"], 6, 2, "tiles.png")
     self.restore_xy = (self.x, self.y)
     self.restore_map_xy = m.get_mapxy()
 
@@ -814,21 +821,25 @@ class PushBlock(Entity):
 
 class Switch(Entity):
   def __init__(self, x, y):
-    super(Switch, self).__init__(x, y, ["renderable", "switch", "relative"], 4, 3, "tiles.png")
+    super(Switch, self).__init__(x, y, ["renderable", "updateable", "switch", "relative"], 4, 3, "tiles.png")
 
   def depth(self):
     return SWITCH_DEPTH
 
   def activate(self, entities):
     for e in entities.get("lock"):
-      e.groups.remove("wall")
-      e.animate([[0, 0]])
+      if "wall" in e.groups:
+        e.groups.remove("wall")
+        e.animate([[0, 0]])
+        self.animate([[5, 3]])
 
   def deactivate(self, entities):
     for e in entities.get("lock"):
       if "wall" not in e.groups:
+        print "adding wall to ", e.uid
         e.add_group("wall")
         e.animate([[7, 2]])
+        self.animate([[4, 3]])
 
 class Reflector(Entity):
   def __init__(self, x, y, type):
@@ -1145,7 +1156,7 @@ class Bullet(Entity):
 
 class Character(Entity):
   def __init__(self, x, y, entities):
-    super(Character, self).__init__(x, y, ["renderable", "updateable", "character", "relative"], 0, 1, "tiles.png")
+    super(Character, self).__init__(x, y, ["renderable", "switchpusher", "updateable", "character", "relative"], 0, 1, "tiles.png")
     self.animticker = 0
 
     self.speed = 5
