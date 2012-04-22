@@ -33,6 +33,7 @@ MAX_HEALTH_INC = 3
 INSANE_LIGHT = 150
 BEAM_START_LENGTH = 5
 ITEM_DRIFT_SPEED = 20
+START_SANITY = 5
 
 #depths
 
@@ -155,6 +156,10 @@ class Entity(object):
 
   def push(self, direction, entities):
     assert "pushable" in self.groups
+
+    m = entities.one("map")
+    #cant push if it's about to fall
+    if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1): return
     direction = (direction[0], 0)
 
     new_x = self.x + direction[0] * TILE_SIZE
@@ -1214,8 +1219,8 @@ class Character(Entity):
     entities.add(self.hp_bar)
     self.hp_bar.visible = False
 
-    self.sanity = 10
-    self.max_sanity = 10
+    self.sanity = START_SANITY
+    self.max_sanity = START_SANITY
 
     self.sanity_bar = Bar(self, (255, 255, 255), (0, 0, 0), self.sanity, self.max_sanity)
     entities.add(self.sanity_bar)
