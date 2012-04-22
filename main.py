@@ -535,6 +535,7 @@ class Map(Entity):
               , (0, 0, 255): 5 # radial light source
               , (200, 0, 0): 6 # sentry
               , (50, 0, 0): 7 # science-wall
+              , (100, 0, 0): 8 # sweeper
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -579,6 +580,10 @@ class Map(Entity):
         elif colors == 7:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 16, 0)
           tile.add_group("wall")
+        elif colors == 8:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          entities.add(Enemy(i * TILE_SIZE, j * TILE_SIZE, Enemy.STRATEGY_SWEEPER))
+          print "sweep"
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -759,8 +764,9 @@ class Pickup(Entity):
 class Enemy(Entity):
   STRATEGY_STUPID = 0
   STRATEGY_SENTRY = 1
+  STRATEGY_SWEEPER = 2
 
-  hp = {STRATEGY_STUPID: 5, STRATEGY_SENTRY: 4}
+  hp = {STRATEGY_STUPID: 5, STRATEGY_SENTRY: 4, STRATEGY_SWEEPER: 6}
 
   def __init__(self, x, y, type):
     self.speed = 3
@@ -773,6 +779,8 @@ class Enemy(Entity):
       super(Enemy, self).__init__(x, y, ["renderable", "updateable", "knocked", "enemy", "relative", "map_element"], 4, 0, "tiles.png")
     elif self.type == Enemy.STRATEGY_SENTRY:
       super(Enemy, self).__init__(x, y, ["renderable", "updateable", "enemy", "relative", "map_element"], 7, 1, "tiles.png")
+    elif self.type == Enemy.STRATEGY_SWEEPER:
+      super(Enemy, self).__init__(x, y, ["renderable", "updateable", "knocked", "enemy", "relative", "map_element"], 9, 1, "tiles.png")
 
 
   def update(self, entities):
@@ -783,6 +791,8 @@ class Enemy(Entity):
       self.be_stupid(entities)
     elif self.type == Enemy.STRATEGY_SENTRY:
       self.be_sentry(entities, ch)
+    elif self.type == Enemy.STRATEGY_SWEEPER:
+      self.be_sweeper(entities, ch)
 
     if self.touches_rect(ch):
       ch.hurt(1)
@@ -811,6 +821,21 @@ class Enemy(Entity):
 
     self.x -= dir[0]
     self.y -= dir[1]
+
+  def be_sweeper(self, entities, ch):
+    if ch.y != self.y: 
+      self.img = TileSheet.get("tiles.png", 9, 1)
+      return
+
+    self.img = TileSheet.get("tiles.png", 9, 0)
+    m = entities.one("map")
+
+    amount = 6
+    dx = sign(ch.x - self.x)
+    while not self.collides_with_wall(entities) and amount > 0:
+      self.x += dx
+      amount -= 1
+    self.x -= dx
 
   def be_sentry(self, entities, ch):
     if Tick.get(20):
