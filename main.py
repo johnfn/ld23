@@ -1430,7 +1430,7 @@ def main():
   manager.add(Particles())
 
   m = Map()
-  m.new_map_abs(manager, 4, 0)
+  m.new_map_abs(manager, 5, 0)
   manager.add(m)
 
   pygame.display.init()
