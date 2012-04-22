@@ -1024,9 +1024,9 @@ class LightSource(Entity):
     self.lightbeampos = []
 
     if light_type == LightSource.BEAM:
-      super(LightSource, self).__init__(x, y, ["wall", "pushable", "renderable", "relative", "updateable", "persistent", "light-source"], 5, 0, "tiles.png")
+      super(LightSource, self).__init__(x, y, ["switchpusher", "wall", "pushable", "renderable", "relative", "updateable", "persistent", "light-source"], 5, 0, "tiles.png")
     elif light_type == LightSource.RADIAL:
-      super(LightSource, self).__init__(x, y, ["wall", "pushable", "renderable", "relative", "updateable", "persistent", "light-source"], 4, 2, "tiles.png")
+      super(LightSource, self).__init__(x, y, ["switchpusher", "wall", "pushable", "renderable", "relative", "updateable", "persistent", "light-source"], 4, 2, "tiles.png")
 
     self.restore_xy = (self.x, self.y)
     self.restore_map_xy = m.get_mapxy()
