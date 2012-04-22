@@ -52,7 +52,7 @@ BAR_DEPTH = 200
 cam_lag_override = 0
 going_insane = False
 
-DEBUG = False
+DEBUG = True
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -832,11 +832,16 @@ class PushBlock(Entity):
     return PUSH_BLOCK_DEPTH
 
   def update(self, entities):
-    if not entities.one("map").get_mapxy() == self.restore_map_xy: 
+    m = entities.one("map")
+
+    if not m.get_mapxy() == self.restore_map_xy: 
       self.visible = False
       return
 
     self.visible = True
+
+    if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1) and Tick.get(8):
+      self.move(self.x, self.y + TILE_SIZE, entities)
 
     super(PushBlock, self).update(entities)
 
@@ -1425,7 +1430,7 @@ def main():
   manager.add(Particles())
 
   m = Map()
-  m.new_map_abs(manager, 2, 0)
+  m.new_map_abs(manager, 4, 0)
   manager.add(m)
 
   pygame.display.init()
@@ -1446,14 +1451,15 @@ def main():
     dark_sound.set_volume(0.0)
 
   while True:
-    if going_insane:
-      if normal_sound.get_volume() > 0.1:
-        normal_sound.set_volume(normal_sound.get_volume() - CROSSFADE_SPEED)
-        dark_sound.set_volume(1 - normal_sound.get_volume())
-    else:
-      if dark_sound.get_volume() > 0.1:
-        normal_sound.set_volume(normal_sound.get_volume() + CROSSFADE_SPEED)
-        dark_sound.set_volume(1 - normal_sound.get_volume())
+    if not DEBUG:
+      if going_insane:
+        if normal_sound.get_volume() > 0.1:
+          normal_sound.set_volume(normal_sound.get_volume() - CROSSFADE_SPEED)
+          dark_sound.set_volume(1 - normal_sound.get_volume())
+      else:
+        if dark_sound.get_volume() > 0.1:
+          normal_sound.set_volume(normal_sound.get_volume() + CROSSFADE_SPEED)
+          dark_sound.set_volume(1 - normal_sound.get_volume())
 
     Tick.inc()
 
