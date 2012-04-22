@@ -48,12 +48,18 @@ CHAR_DEPTH = 80
 TEXT_DEPTH = 100
 BAR_DEPTH = 200
 
+# sfx
+
+land_sound  = None
+jump_sound  = None
+shoot_sound = None
+
 #hax
 
 cam_lag_override = 0
 going_insane = False
 
-DEBUG = True
+DEBUG = False
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -673,6 +679,8 @@ class Map(Entity):
           if new_map: light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.BEAM_LEFT])
         elif colors == 13:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          tile.add_group("wall")
+          tile.add_group("glass")
           entities.add(Glass(i * TILE_SIZE, j * TILE_SIZE))
         elif colors == 14:
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
@@ -913,18 +921,9 @@ class Reflector(Entity):
 
 class Glass(Entity):
   def __init__(self, x, y):
-    super(Glass, self).__init__(x, y, ["renderable", "wall", "glass", "relative"], 1, 1, "tiles.png")
+    super(Glass, self).__init__(x, y, ["renderable", "map_element", "wall", "glass", "relative"], 1, 1, "tiles.png")
 
   def depth(self): return 1
-
-  def update(self, entities):
-    m = entities.one("map")
-
-    if not m.get_mapxy() == self.restore_map_xy: 
-      self.visible = False
-      return
-
-    self.visible = True
 
 class Powerup(Entity):
   SANITY = 0
@@ -1051,6 +1050,7 @@ class Enemy(Entity):
       mag = math.sqrt((self.x - ch.x) ** 2 + (self.y - ch.y) ** 2)
       direct = (spd * (ch.x - self.x) / mag, spd * (ch.y - self.y) / mag)
       b = Bullet(self, direct, 1)
+      if not DEBUG: shoot_sound.play()
       entities.add(b)
   
   def be_stupid(self, entities):
@@ -1345,6 +1345,7 @@ class Character(Entity):
       cam_lag_override = 1
 
   def shoot_bullet(self, entities):
+    if not DEBUG: shoot_sound.play()
     b = Bullet(self, self.direction, 1)
     entities.add(b)
 
@@ -1396,7 +1397,10 @@ class Character(Entity):
 
     if UpKeys.key_down(pygame.K_UP):
       self.direction = (0, -1)
-    if UpKeys.key_down(pygame.K_SPACE) and self.onground: self.vy = 14
+    if UpKeys.key_down(pygame.K_SPACE) and self.onground: 
+      self.vy = 14
+      if not DEBUG:
+        jump_sound.play()
 
     self.vy -= GRAVITY
     dy -= self.vy
@@ -1417,6 +1421,8 @@ class Character(Entity):
     while self.collides_with_wall(entities):
       self.y -= sign(dy) or -1
 
+    oldOG = self.onground
+
     self.onground = False
 
     for p in zip(range(self.x + 2, self.x + self.size - 2), [self.y + self.size + 1] * self.size):
@@ -1427,6 +1433,8 @@ class Character(Entity):
     if self.onground:
       dy = 0
       self.vy = 0
+
+      if not DEBUG and not oldOG: land_sound.play()
 
     self.check_new_map(entities)
     self.check_sanity(entities)
@@ -1508,7 +1516,7 @@ def main():
   manager.add(Particles())
 
   m = Map()
-  m.new_map_abs(manager, 5, 1)
+  m.new_map_abs(manager, 3, 1)
   manager.add(m)
 
   pygame.display.init()
@@ -1527,6 +1535,16 @@ def main():
 
     dark_sound.play(-1)
     dark_sound.set_volume(0.0)
+
+    global land_sound
+    land_sound = pygame.mixer.Sound("land or hurt.wav")
+
+    global jump_sound
+    jump_sound = pygame.mixer.Sound("jump.wav")
+
+    global shoot_sound
+    shoot_sound = pygame.mixer.Sound("shoot.wav")
+    shoot_sound.set_volume(0.2)
 
   while True:
     if not DEBUG:
