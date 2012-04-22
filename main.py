@@ -724,6 +724,19 @@ class Reflector(Entity):
   def reflect(self, direction):
     return [direction[1], -direction[0]]
 
+class Pickup(Entity):
+  HEALTH = 0
+
+  def __init__(self, x, y, type):
+    if type == Pickup.HEALTH:
+      super(Pickup, self).__init__(x, y, ["renderable", "pickupable", "updateable", "relative"], 13, 0, "tiles.png")
+    else:
+      assert(False)
+
+  def pickup(self, ch):
+    ch.heal(3)
+    print "up"
+
 class Enemy(Entity):
   STRATEGY_STUPID = 0
   STRATEGY_SENTRY = 1
@@ -752,6 +765,8 @@ class Enemy(Entity):
 
   def die(self, entities):
     entities.remove(self)
+
+    entities.add(Pickup(self.x, self.y, Pickup.HEALTH))
 
   def hurt(self, amt, entities, dir):
     self.hp -= 1
@@ -1013,6 +1028,9 @@ class Character(Entity):
       self.hp = self.max_hp
 
     self.hp_bar.set_amt(self.hp)
+    self.hp_bar.visible = True
+    self.hp_bar.alpha = 255
+    self.hp_bar.fadeout()
 
   def check_new_map(self, entities):
     m = entities.one("map")
@@ -1043,11 +1061,18 @@ class Character(Entity):
 
     pushblock[0].push(self.direction, entities)
 
+  def take_pickups(self, entities):
+    for item in entities.get("pickupable", lambda p: p.touches_rect(self)):
+      item.pickup(self)
+      entities.remove(item)
+
   def update(self, entities):
     self.x = int(self.x)
     self.y = int(self.y)
 
     can_update = super(Character, self).update(entities)
+
+    self.take_pickups(entities)
 
     if not can_update: return
 
