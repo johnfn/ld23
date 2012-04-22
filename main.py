@@ -183,7 +183,7 @@ class Entity(object):
       went_offscreen = True
     elif self.y > MAP_SIZE_PIXELS:
       self.y = TILE_SIZE * 2
-      self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
+      self.restore_map_xy = (self.restore_map_xy[0], self.restore_map_xy[1] + 1)
       went_offscreen = True
 
     if went_offscreen: self.restore_xy = (self.x, self.y)
@@ -676,7 +676,7 @@ class Map(Entity):
     self.calculate_lighting(light_sources, entities)
 
   def is_wall_rel(self, i, j):
-    if i < 0 or j < 0 or i >= MAP_SIZE_TILES or j >= MAP_SIZE_TILES: return True
+    if i < 0 or j < 0 or i >= MAP_SIZE_TILES or j >= MAP_SIZE_TILES: return False
     return "wall" in self.tiles[i][j].groups
 
   def calculate_lighting(self, light_sources, entities):
@@ -1430,7 +1430,7 @@ def main():
   manager.add(Particles())
 
   m = Map()
-  m.new_map_abs(manager, 5, 0)
+  m.new_map_abs(manager, 6, 0)
   manager.add(m)
 
   pygame.display.init()
