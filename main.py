@@ -533,6 +533,8 @@ class Map(Entity):
               , (0, 0, 100): 3 # beam light source
               , (100, 100, 100): 4 #reflector
               , (0, 0, 255): 5 # radial light source
+              , (200, 0, 0): 6 # sentry
+              , (50, 0, 0): 7 # science-wall
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -571,6 +573,12 @@ class Map(Entity):
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           #particle_sources.append([i * TILE_SIZE, j * TILE_SIZE])
           if new_map: light_sources.append([i * TILE_SIZE, j * TILE_SIZE, LightSource.RADIAL])
+        elif colors == 6:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          entities.add(Enemy(i * TILE_SIZE, j * TILE_SIZE, Enemy.STRATEGY_SENTRY))
+        elif colors == 7:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 16, 0)
+          tile.add_group("wall")
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -752,7 +760,8 @@ class Pickup(Entity):
 class Enemy(Entity):
   STRATEGY_STUPID = 0
   STRATEGY_SENTRY = 1
-  hp = {STRATEGY_STUPID: 5}
+
+  hp = {STRATEGY_STUPID: 5, STRATEGY_SENTRY: 4}
 
   def __init__(self, x, y, type):
     self.speed = 3
@@ -760,15 +769,21 @@ class Enemy(Entity):
     self.hp = Enemy.hp[self.type]
 
     self.direction = [1, 0]
-    super(Enemy, self).__init__(x, y, ["renderable", "updateable", "enemy", "relative", "map_element"], 4, 0, "tiles.png")
+    if self.type == Enemy.STRATEGY_STUPID:
+      super(Enemy, self).__init__(x, y, ["renderable", "updateable", "knocked", "enemy", "relative", "map_element"], 4, 0, "tiles.png")
+    elif self.type == Enemy.STRATEGY_SENTRY:
+      super(Enemy, self).__init__(x, y, ["renderable", "updateable", "enemy", "relative", "map_element"], 7, 1, "tiles.png")
+
 
   def update(self, entities):
     super(Enemy, self).update(entities)
+    ch = entities.one("character")
 
     if self.type == Enemy.STRATEGY_STUPID:
       self.be_stupid(entities)
+    elif self.type == Enemy.STRATEGY_SENTRY:
+      self.be_sentry(entities, ch)
 
-    ch = entities.one("character")
     if self.touches_rect(ch):
       ch.hurt(1)
 
@@ -785,7 +800,8 @@ class Enemy(Entity):
     if self.hp <= 0:
       self.die(entities)
     else:
-      self.knockback(5, entities, (sign(dir[0]), sign(dir[1])))
+      if "knocked" in self.groups:
+        self.knockback(5, entities, (sign(dir[0]), sign(dir[1])))
 
   def knockback(self, dist, entities, dir):
     while not self.collides_with_wall(entities) and dist > 0:
@@ -796,7 +812,9 @@ class Enemy(Entity):
     self.x -= dir[0]
     self.y -= dir[1]
 
-
+  def be_sentry(self, entities, ch):
+    pass
+  
   def be_stupid(self, entities):
     self.x += self.direction[0]
     self.y += self.direction[1]
@@ -970,7 +988,12 @@ class Bullet(Entity):
     self.owner = owner
     self.dmg = dmg
     self.dying = False
-    super(Bullet, self).__init__(owner.x, owner.y + random.randrange(-4, 4), ["renderable", "updateable", "bullet", "relative", "map_element"], 3, 0, "tiles.png")
+
+    if "character" in owner.groups:
+      if direction[1] == 0:
+        super(Bullet, self).__init__(owner.x, owner.y + random.randrange(-4, 4), ["renderable", "updateable", "bullet", "relative", "map_element"], 3, 0, "tiles.png")
+      else:
+        super(Bullet, self).__init__(owner.x + random.randrange(-4, 4), owner.y, ["renderable", "updateable", "bullet", "relative", "map_element"], 0, 5, "tiles.png")
 
     self.x += int(direction[0] * owner.size / 2)
     self.y += int(direction[1] * owner.size / 2)
