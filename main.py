@@ -1097,8 +1097,6 @@ class Enemy(Entity):
   def be_stupid(self, entities):
     m = entities.one("map")
 
-    print entities.get("crate")[0].y, self.y
-
     if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1) and \
         not m.is_wall_rel(int((self.x + TILE_SIZE - 1)/TILE_SIZE), int(self.y / TILE_SIZE) + 1):
       if not entities.any("crate", lambda e: e.x == self.x and e.y == self.y + TILE_SIZE):

@@ -1,16 +1,14 @@
 # Ludum Dare 23
 
-Last time I jinxed myself by saying something here. (And I know that jinxes aren't a thing that actually exist, but you know how it is.)
+This game is DONE.
 
-So all I'm saying is: This is my pre-Ludum Dare repository.
-
-There's some starter code here.
+There are probably a few gnarly bugs left, and there's probably at least one way to get yourself into an unwinnable situation. I'm going to be ironing out any game-killing stuff and making ports soon (24h).
 
 ## Compiling from source on OSX:
 
-   port install py-game
+     port install py-game
 
-   python main.py
+     python main.py
 
 ## Compiling from source on Ubuntu:
 
