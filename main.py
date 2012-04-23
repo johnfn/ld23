@@ -57,6 +57,7 @@ shoot_sound = None
 #hax
 
 cam_lag_override = 0
+you_win_override = True
 going_insane = False
 
 DEBUG = True
@@ -610,6 +611,7 @@ class Map(Entity):
               , (255, 255, 0): 13 # glass
               , (255, 128, 0): 14 # +1 sanity
               , (111, 111, 111): 15 # Dialog
+              , (50, 100, 150): 16 # Winner
               }
 
     self.tiles = [[None for i in range(MAP_SIZE_TILES)] for j in range(MAP_SIZE_TILES)]
@@ -683,6 +685,9 @@ class Map(Entity):
           tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
           if self.get_mapxy() not in Dialog.SEEN:
             entities.add(Dialog(i * TILE_SIZE, j * TILE_SIZE, self.get_mapxy()))
+        elif colors == 16:
+          tile = Tile(i * TILE_SIZE, j * TILE_SIZE, 0, 0)
+          entities.add(YouWin(i * TILE_SIZE, j * TILE_SIZE))
 
         tile.add_group("map_element")
         entities.add(tile)
@@ -912,6 +917,18 @@ class Switch(Entity):
         e.animate([[7, 2]])
         self.animate([[4, 3]])
 
+class YouWin(Entity):
+  def __init__(self, x, y):
+    super(YouWin, self).__init__(x, y, ["renderable", "you-win", "updateable", "relative"], 2, 1, "tiles.png")
+    self.can_win = False
+  
+  def update(self, entities):
+    if len(entities.get("beam", "wall")) == 2 and not self.can_win:
+      self.img = TileSheet.get("tiles.png", 2, 2)
+      self.can_win = True
+
+  def depth(self): return 2
+
 class Reflector(Entity):
   def __init__(self, x, y, type):
     self.direction = [1, 0]
@@ -1117,7 +1134,7 @@ class LightSource(Entity):
     self.lightbeampos = []
 
     if light_type == LightSource.BEAM:
-      super(LightSource, self).__init__(x, y, ["switchpusher", "wall", "pushable", "renderable", "relative", "updateable", "persistent", "light-source"], 5, 0, "tiles.png")
+      super(LightSource, self).__init__(x, y, ["switchpusher", "wall", "pushable", "renderable", "relative", "updateable", "persistent", "light-source", "beam"], 5, 0, "tiles.png")
     elif light_type == LightSource.RADIAL:
       super(LightSource, self).__init__(x, y, ["switchpusher", "wall", "pushable", "renderable", "relative", "updateable", "persistent", "light-source"], 4, 2, "tiles.png")
 
@@ -1327,8 +1344,7 @@ class Character(Entity):
     self.sanity_bar.visible = False
 
   def die(self):
-    print "you die!!!!!!!!!!!!!!"
-    assert(False)
+    self.zoom(self.last_safe_place, self.last_safe_room, entities)
 
   def hurt(self, amt):
     if self.is_flashing(): return
@@ -1411,11 +1427,19 @@ class Character(Entity):
       entities.add(Text(self, d[0].read(), d[0].colored()))
       entities.remove(d[0])
 
+  def check_win(self, entities):
+    if entities.any("you-win", lambda e: e.can_win and e.touches_rect(self)):
+      global you_win_override
+      you_win_override = False
+
+      print "you win!"
+
   def update(self, entities):
     self.x = int(self.x)
     self.y = int(self.y)
 
     can_update = super(Character, self).update(entities)
+    self.check_win(entities)
 
     if not can_update: return
 
@@ -1591,7 +1615,7 @@ def main():
     shoot_sound = pygame.mixer.Sound("shoot.wav")
     shoot_sound.set_volume(0.2)
 
-  while True:
+  while you_win_override:
     if not DEBUG:
       if going_insane:
         if normal_sound.get_volume() > 0.1:
@@ -1615,7 +1639,7 @@ def main():
         UpKeys.release_key(event.key)
 
     if UpKeys.key_down(pygame.K_w) and UpKeys.key_down(310): # Q and CMD
-      break
+      sys.exit()
 
     #TODO: Better is a updateDepth() on each entity.
     for e in sorted(manager.get("updateable"), key=lambda x: x.depth()):
@@ -1630,5 +1654,29 @@ def main():
 
     pygame.display.flip()
 
+def youwin():
+  while True:
+    screen.fill((255, 255, 255))
+
+    win_msg = """
+    You successfully found the tiny planet you call home.
+
+    YOU WIN!
+    """
+
+    pygame.font.init()
+    my_font = pygame.font.Font("nokiafc22.ttf", 12)
+    my_rect = pygame.Rect((0, 0, 300, 300))
+    my_rect.x = 0
+    my_rect.y = 50
+
+    color = (10,10,10)
+    rendered_text = render_textrect(win_msg, my_font, my_rect, color, (255, 255, 255), False, 1)
+
+    screen.blit(rendered_text, my_rect.topleft)
+
+    pygame.display.flip()
+
 #cProfile.run('main()')
 main()
+youwin()
