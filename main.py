@@ -60,7 +60,7 @@ cam_lag_override = 0
 you_win_override = True
 going_insane = False
 
-DEBUG = False
+DEBUG = True
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -944,6 +944,8 @@ class Dialog(Entity):
             , (1, 0): "The darkness will drive you mad if you stay in it too long. The white bar represents your sanity."
             , (2, 0): "And these are directional lights. More powerful, but they only fire in a single direction."
             , (3, 0): "Fire your trusty gun with the X key."
+            , (4, 1): "Hm. That +1 thing makes me feel a little more sane."
+            , (5, 3): "Hey! It's a tiny planet summoner! That could get me back home! Seems like it needs power, though... two light beams should do it."
             }
   REDS = { (1, 0): True }
   SEEN = {}
@@ -1326,6 +1328,7 @@ class Character(Entity):
     self.direction = (1, 0)
     self.last_safe_place = (x, y)
     self.last_safe_room = (0, 0)
+    self.been_safe_for = 0
 
     self.hp = 5
     self.max_hp = 5
@@ -1425,6 +1428,11 @@ class Character(Entity):
       entities.add(Text(self, d[0].read(), d[0].colored()))
       entities.remove(d[0])
 
+      # create a checkpoint
+
+      self.last_safe_place = (self.x, self.y)
+      self.last_safe_room = entities.one("map").get_mapxy()
+
   def check_win(self, entities):
     if entities.any("you-win", lambda e: e.can_win and e.touches_rect(self)):
       global you_win_override
@@ -1507,6 +1515,7 @@ class Character(Entity):
 
   def soft_death(self, entities):
     self.fadein()
+
     self.zoom(self.last_safe_place, self.last_safe_room, entities)
 
   def depth(self):
@@ -1528,10 +1537,6 @@ class Character(Entity):
     if not light_amt > INSANE_LIGHT: 
       global going_insane
       going_insane = False
-
-      if self.onground:
-        self.last_safe_place = (self.x, self.y)
-        self.last_safe_room = entities.one("map").get_mapxy()
 
       if self.sanity < self.max_sanity:
         if Tick.get(6): 
