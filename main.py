@@ -962,7 +962,10 @@ class Dialog(Entity):
   def colored(self):
     return self.loc in Dialog.REDS
 
-  def read(self):
+  def read(self, entities):
+    for e in entities.get("dialog"):
+      entities.remove(e)
+
     Dialog.SEEN[self.loc] = True
     return Dialog.DIALOGS[self.loc]
 
@@ -1435,7 +1438,7 @@ class Character(Entity):
   def check_dialog(self, entities):
     d = entities.get("dialog", lambda e: e.touches_rect(self))
     if len(d) > 0:
-      entities.add(Text(self, d[0].read(), d[0].colored()))
+      entities.add(Text(self, d[0].read(entities), d[0].colored()))
       entities.remove(d[0])
 
       # create a checkpoint
@@ -1599,7 +1602,7 @@ def main():
 
   m = Map()
   if DEBUG:
-    m.new_map_abs(manager, 2, 0)
+    m.new_map_abs(manager, 5, 3)
   else:
     m.new_map_abs(manager, 0, 0)
 
