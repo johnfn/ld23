@@ -149,8 +149,6 @@ class Entity(object):
     self.jiggling = 0
     self.old_xy = ()
     self.flashing = 0
-    self.zooming = False
-    self.zoom_pos = (0, 0)
 
     self.fade_out = False
     self.fade_in = False
@@ -212,8 +210,8 @@ class Entity(object):
     self.visible = val
 
   def zoom(self, position):
-    self.zooming = True
-    self.zoom_pos = position
+    self.x = position[0]
+    self.y = position[1]
 
   def jiggle(self):
     self.jiggling = JIGGLE_LENGTH
@@ -224,7 +222,7 @@ class Entity(object):
     return entities.any("wall", lambda x: x.touches_rect(nr))
 
   def nicer_rect(self):
-    return Rect(self.x + 2, self.y + 2, self.size - 4)
+    return Rect(self.x + 1, self.y + 1, self.size - 2)
 
   def touches_point(self, point):
     return self.x <= point[0] <= self.x + self.size and\
@@ -313,20 +311,6 @@ class Entity(object):
 
     if len(self.anim) > 0 and Tick.get(8):
       self.img = TileSheet.get("tiles.png", *self.anim.pop(0))
-
-    if self.zooming:
-      if abs(self.x - self.zoom_pos[0]) + abs(self.y - self.zoom_pos[1]) > 5:
-        self.alpha = 100
-        self.x += (self.zoom_pos[0] - self.x) / ZOOM_SPEED
-        self.y += (self.zoom_pos[1] - self.y) / ZOOM_SPEED
-
-        return False
-      else:
-        self.x = self.zoom_pos[0]
-        self.y = self.zoom_pos[1]
-
-        self.alpha = 255
-        self.zooming = False
 
     if self.fade_out and self.alpha > 0:
       self.alpha -= 5
@@ -1513,11 +1497,13 @@ class Character(Entity):
       self.sanity_bar.fadeout()
 
     # We're in a reasonable amount of light.
-    if not entities.one("all-lights").get_lighting_rel(int(self.x/20), int(self.y/20)) > INSANE_LIGHT: 
+    light_amt = entities.one("all-lights").get_lighting_rel(int(self.x/20), int(self.y/20)) 
+    if not light_amt > INSANE_LIGHT: 
       global going_insane
       going_insane = False
 
-      self.last_safe_place = (self.x, self.y)
+      if self.onground:
+        self.last_safe_place = (self.x, self.y)
 
       if self.sanity < self.max_sanity:
         if Tick.get(6): 
