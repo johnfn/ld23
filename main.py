@@ -886,7 +886,7 @@ class PushBlock(Entity):
     self.visible = True
 
     if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1) and Tick.get(8):
-      if not entities.any("enemy", lambda a: a.touches_point((self.x, self.y + TILE_SIZE))):
+      if not entities.any("enemy", lambda a: a.touches_point((self.x + 4, self.y + TILE_SIZE))):
         if not entities.any("crate", lambda a: a.uid != self.uid and a.touches_point((self.x + 1, self.y + TILE_SIZE))):
           self.move(self.x, self.y + TILE_SIZE, entities)
 
@@ -1094,7 +1094,8 @@ class Enemy(Entity):
 
     print entities.get("crate")[0].y, self.y
 
-    if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1):
+    if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1) and \
+        not m.is_wall_rel(int((self.x + TILE_SIZE - 1)/TILE_SIZE), int(self.y / TILE_SIZE) + 1):
       if not entities.any("crate", lambda e: e.x == self.x and e.y == self.y + TILE_SIZE):
         if Tick.get(8):
           self.move(self.x, self.y + TILE_SIZE, entities)
