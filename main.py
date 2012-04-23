@@ -1550,7 +1550,7 @@ class Character(Entity):
       self.sanity_bar.fadeout()
 
     # We're in a reasonable amount of light.
-    light_amt = entities.one("all-lights").get_lighting_rel(int(self.x/20), int(self.y/20)) 
+    light_amt = entities.one("all-lights").get_lighting_rel(int((self.x + 8)/20), int((self.y + 8)/20)) 
     if not light_amt > INSANE_LIGHT: 
       global going_insane
       going_insane = False
