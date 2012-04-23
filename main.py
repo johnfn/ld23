@@ -165,7 +165,12 @@ class Entity(object):
 
     m = entities.one("map")
     #cant push if it's about to fall
-    if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1): return
+    #TODO total dupe of PushBlock/update
+    if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1): 
+      if not entities.any("enemy", lambda a: a.touches_point((self.x + 1, self.y + TILE_SIZE))):
+        if not entities.any("crate", lambda a: a.uid != self.uid and a.touches_point((self.x + 1, self.y + TILE_SIZE))):
+          return
+
     direction = (direction[0], 0)
 
     new_x = self.x + direction[0] * TILE_SIZE
@@ -219,7 +224,7 @@ class Entity(object):
     return entities.any("wall", lambda x: x.touches_rect(nr))
 
   def nicer_rect(self):
-    return Rect(self.x, self.y , self.size)
+    return Rect(self.x + 2, self.y + 2, self.size - 4)
 
   def touches_point(self, point):
     return self.x <= point[0] <= self.x + self.size and\
@@ -881,7 +886,9 @@ class PushBlock(Entity):
     self.visible = True
 
     if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1) and Tick.get(8):
-      self.move(self.x, self.y + TILE_SIZE, entities)
+      if not entities.any("enemy", lambda a: a.touches_point((self.x, self.y + TILE_SIZE))):
+        if not entities.any("crate", lambda a: a.uid != self.uid and a.touches_point((self.x + 1, self.y + TILE_SIZE))):
+          self.move(self.x, self.y + TILE_SIZE, entities)
 
     super(PushBlock, self).update(entities)
 
