@@ -1192,7 +1192,7 @@ class LightSource(Entity):
 
     self.visible = True
 
-    if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1) and Tick.get(8):
+    if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1) and Tick.get(3):
       self.move(self.x, self.y + TILE_SIZE, entities)
 
   def light_beam_pos(self):
@@ -1588,7 +1588,11 @@ def main():
   manager.add(Particles())
 
   m = Map()
-  m.new_map_abs(manager, 0, 0)
+  if DEBUG:
+    m.new_map_abs(manager, 6, 0)
+  else:
+    m.new_map_abs(manager, 0, 0)
+
   manager.add(m)
 
   pygame.display.init()
