@@ -209,9 +209,13 @@ class Entity(object):
     if not self.visible and val: self.alpha = 255
     self.visible = val
 
-  def zoom(self, position):
+  def zoom(self, position, room, entities):
     self.x = position[0]
     self.y = position[1]
+
+    m = entities.one("map")
+    if m.get_mapxy() != room:
+      m.new_map_abs(entities, *room)
 
   def jiggle(self):
     self.jiggling = JIGGLE_LENGTH
@@ -1306,6 +1310,7 @@ class Character(Entity):
     self.cooldown = 5
     self.direction = (1, 0)
     self.last_safe_place = (x, y)
+    self.last_safe_room = (0, 0)
 
     self.hp = 5
     self.max_hp = 5
@@ -1478,9 +1483,9 @@ class Character(Entity):
     self.check_new_map(entities)
     self.check_sanity(entities)
 
-  def soft_death(self):
+  def soft_death(self, entities):
     self.fadein()
-    self.zoom(self.last_safe_place)
+    self.zoom(self.last_safe_place, self.last_safe_room, entities)
 
   def depth(self):
     return CHAR_DEPTH
@@ -1504,6 +1509,7 @@ class Character(Entity):
 
       if self.onground:
         self.last_safe_place = (self.x, self.y)
+        self.last_safe_room = entities.one("map").get_mapxy()
 
       if self.sanity < self.max_sanity:
         if Tick.get(6): 
@@ -1519,7 +1525,7 @@ class Character(Entity):
       self.sanity_bar.jiggling = 20
 
     if self.sanity <= 0:
-      self.soft_death()
+      self.soft_death(entities)
 
 def render_all(manager, lag = CAM_LAG):
   global cam_lag_override
