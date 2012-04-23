@@ -60,7 +60,7 @@ cam_lag_override = 0
 you_win_override = True
 going_insane = False
 
-DEBUG = True
+DEBUG = False
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -1585,7 +1585,7 @@ def main():
   manager.add(Particles())
 
   m = Map()
-  m.new_map_abs(manager, 5, 3)
+  m.new_map_abs(manager, 0, 0)
   manager.add(m)
 
   pygame.display.init()
