@@ -797,7 +797,7 @@ class Text(Entity):
 
     my_width = 300
     my_font = pygame.font.Font("nokiafc22.ttf", 12)
-    vis_text = self.contents[:self.shown_chars]
+    vis_text = self.contents[:self.shown_chars] + "\n(press z)"
 
     my_rect = pygame.Rect((self.follow.x + dx - my_width / 2, self.follow.y + dy - len(vis_text) - 30, my_width, 150))
     my_rect.x = 0
@@ -1038,7 +1038,7 @@ class Enemy(Entity):
       self.be_sweeper(entities, ch)
 
     if self.touches_rect(ch):
-      ch.hurt(1)
+      ch.hurt(1, entities)
 
   def depth(self):
     return ENEMY_DEPTH
@@ -1309,7 +1309,7 @@ class Bullet(Entity):
     else:
       ch = entities.get("character", hitlambda)
       if len(ch) > 0:
-        ch[0].hurt(1)
+        ch[0].hurt(1, entities)
         self.die()
         return
 
@@ -1341,16 +1341,16 @@ class Character(Entity):
     entities.add(self.sanity_bar)
     self.sanity_bar.visible = False
 
-  def die(self):
+  def die(self, entities):
     self.zoom(self.last_safe_place, self.last_safe_room, entities)
 
-  def hurt(self, amt):
+  def hurt(self, amt, entities):
     if self.is_flashing(): return
 
     self.hp -= amt
     if self.hp <= 0:
       self.hp = 0
-      self.die()
+      self.die(entities)
 
     self.hp_bar.set_amt(self.hp)
     self.hp_bar.jiggle()
