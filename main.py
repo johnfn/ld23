@@ -188,20 +188,22 @@ class Entity(object):
 
     went_offscreen = False
 
-    if self.x < 0: 
+    if self.x <= 0: 
       self.x = MAP_SIZE_PIXELS - TILE_SIZE * 2
       self.restore_map_xy = (self.restore_map_xy[0] - 1, self.restore_map_xy[1])
       went_offscreen = True
-    elif self.x > MAP_SIZE_PIXELS:
+    elif self.x >= MAP_SIZE_PIXELS:
       self.x = TILE_SIZE * 2
       self.restore_map_xy = (self.restore_map_xy[0] + 1, self.restore_map_xy[1])
       went_offscreen = True
-    elif self.y > MAP_SIZE_PIXELS:
+    elif self.y >= MAP_SIZE_PIXELS:
       self.y = TILE_SIZE * 2
       self.restore_map_xy = (self.restore_map_xy[0], self.restore_map_xy[1] + 1)
       went_offscreen = True
 
-    if went_offscreen: self.restore_xy = (self.x, self.y)
+    if went_offscreen: 
+      self.restore_xy = (self.x, self.y)
+      print self.restore_xy
 
   def getvis(self): 
     return self.visible
@@ -951,7 +953,7 @@ class Dialog(Entity):
   SEEN = {}
 
   def __init__(self, x, y, loc):
-    super(Dialog, self).__init__(x, y, ["renderable", "dialog", "relative"], 0, 0, "tiles.png")
+    super(Dialog, self).__init__(x, y, ["renderable", "dialog", "map_element", "relative"], 0, 0, "tiles.png")
     self.loc = loc
 
   def colored(self):
@@ -1589,7 +1591,7 @@ def main():
 
   m = Map()
   if DEBUG:
-    m.new_map_abs(manager, 6, 0)
+    m.new_map_abs(manager, 0, 0)
   else:
     m.new_map_abs(manager, 0, 0)
 
