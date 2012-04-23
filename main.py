@@ -951,10 +951,12 @@ class Dialog(Entity):
             , (1, 0): "The darkness will drive you mad if you stay in it too long. The white bar represents your sanity."
             , (2, 0): "And these are directional lights. More powerful, but they only fire in a single direction."
             , (3, 0): "Fire your trusty gun with the X key."
+            , (3, 0): "To reset blocks and lights to their original positions, leave and re-enter the room."
             , (5, 3): "Hey! It's a tiny planet summoner! That could get me back home! Seems like it needs power, though... two light beams should do it."
             , (5, 1): "Hmm. Glass overhead."
             }
-  REDS = { (1, 0): True }
+  REDS = { (1, 0): True
+         , (4, 0): True}
   SEEN = {}
 
   def __init__(self, x, y, loc):
