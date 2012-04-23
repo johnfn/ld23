@@ -123,14 +123,18 @@ class TileSheet:
 #TODO: Entity should extend Rect.
 
 class Rect(object):
-  def __init__(self, x, y, s):
+  def __init__(self, x, y, w, h=None):
+    if h is None: h = w
+
     self.x = x
     self.y = y
-    self.size = s
+    self.width = w
+    self.height = h
+    self.size = w
 
   def touches_point(self, point):
-    return self.x <= point[0] <= self.x + self.size and\
-           self.y <= point[1] <= self.y + self.size
+    return self.x <= point[0] <= self.x + self.width and\
+           self.y <= point[1] <= self.y + self.height
 
 class Entity(object):
   def __init__(self, x, y, groups, src_x = -1, src_y = -1, src_file = ""):
@@ -230,6 +234,14 @@ class Entity(object):
 
   def nicer_rect(self):
     return Rect(self.x + 1, self.y + 1, self.size - 2)
+
+  def bigger_rect(self, dire):
+    if dire[0] > 0:
+      return Rect(self.x, self.y, self.size + 5, self.size)
+    if dire[0] < 0: 
+      return Rect(self.x - 5, self.y, self.size + 5, self.size)
+
+    return Rect(self.x, self.y, self.size)
 
   def touches_point(self, point):
     return self.x <= point[0] <= self.x + self.size and\
@@ -879,6 +891,9 @@ class PushBlock(Entity):
   def update(self, entities):
     m = entities.one("map")
 
+    self.x = int(self.x / TILE_SIZE) * TILE_SIZE
+    self.y = int(self.y / TILE_SIZE) * TILE_SIZE
+
     if not m.get_mapxy() == self.restore_map_xy: 
       self.visible = False
       return
@@ -919,7 +934,6 @@ class Switch(Entity):
   def deactivate(self, entities):
     for e in entities.get("lock"):
       if "wall" not in e.groups:
-        print "adding wall to ", e.uid
         e.add_group("wall")
         e.animate([[7, 2]])
         self.animate([[4, 3]])
@@ -1420,10 +1434,15 @@ class Character(Entity):
     entities.add(b)
 
   def check_for_push(self, entities):
-    pushblock = entities.get("pushable", lambda x: x.touches_rect(self))
+    print "check push"
+    print "mine", self.x, self.y, self.size
+    for e in entities.get("pushable"):
+      print e.x, e.y, e.size
+    pushblock = entities.get("pushable", "wall", lambda x: x.touches_rect(self.bigger_rect(self.direction)))
     if len(pushblock) == 0: return
 
-    pushblock[0].push(self.direction, entities)
+    for p in pushblock:
+      p.push(self.direction, entities)
 
   def take_pickups(self, entities):
     for item in entities.get("pickupable"):
@@ -1606,7 +1625,7 @@ def main():
 
   m = Map()
   if DEBUG:
-    m.new_map_abs(manager, 3, 1)
+    m.new_map_abs(manager, 5, 1)
   else:
     m.new_map_abs(manager, 0, 0)
 
