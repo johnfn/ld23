@@ -1193,6 +1193,11 @@ class LightSource(Entity):
 
     self.visible = True
 
+    # This is a hardcore hack. The idea is that the globe NEEDS to remember to stay here. its IMPERATIVE!!!
+    if self.x == 200 and self.y == 340 and m.get_mapxy() == (5, 1):
+      self.restore_xy = (self.x, self.y)
+      self.restore_map_xy = m.get_mapxy()
+
     if not m.is_wall_rel(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE) + 1) and Tick.get(3):
       self.move(self.x, self.y + TILE_SIZE, entities)
 
@@ -1591,7 +1596,7 @@ def main():
 
   m = Map()
   if DEBUG:
-    m.new_map_abs(manager, 0, 0)
+    m.new_map_abs(manager, 5, 1)
   else:
     m.new_map_abs(manager, 0, 0)
 
