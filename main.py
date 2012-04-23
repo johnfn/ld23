@@ -1047,7 +1047,6 @@ class Enemy(Entity):
 
   def die(self, entities):
     entities.remove(self)
-
     entities.add(Pickup(self.x, self.y, Pickup.HEALTH))
 
   def hurt(self, amt, entities, dir):
@@ -1345,6 +1344,7 @@ class Character(Entity):
     self.sanity_bar.visible = False
 
   def die(self, entities):
+    self.hp = self.max_hp
     self.zoom(self.last_safe_place, self.last_safe_room, entities)
 
   def hurt(self, amt, entities):
