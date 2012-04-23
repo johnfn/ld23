@@ -311,7 +311,9 @@ class Entity(object):
 
           #save position of the block that's pushing the switch.
           if "persistent" in e.groups:
-            e.restore_xy = (e.x, e.y)
+            # This hack prevents an unwinnable situation in room (3, 1).
+            if not (e.x == 240 and e.y ==  360 and e.restore_map_xy == (3, 1)):
+              e.restore_xy = (e.x, e.y)
 
       if not activated:
         self.deactivate(entities)
@@ -1602,7 +1604,7 @@ def main():
 
   m = Map()
   if DEBUG:
-    m.new_map_abs(manager, 5, 3)
+    m.new_map_abs(manager, 3, 1)
   else:
     m.new_map_abs(manager, 0, 0)
 
