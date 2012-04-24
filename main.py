@@ -207,7 +207,6 @@ class Entity(object):
 
     if went_offscreen: 
       self.restore_xy = (self.x, self.y)
-      print self.restore_xy
 
   def getvis(self): 
     return self.visible
@@ -940,7 +939,7 @@ class Switch(Entity):
 
 class YouWin(Entity):
   def __init__(self, x, y):
-    super(YouWin, self).__init__(x, y, ["renderable", "you-win", "updateable", "relative"], 2, 1, "tiles.png")
+    super(YouWin, self).__init__(x, y, ["renderable", "map_element", "you-win", "updateable", "relative"], 2, 1, "tiles.png")
     self.can_win = False
   
   def update(self, entities):
@@ -1434,10 +1433,6 @@ class Character(Entity):
     entities.add(b)
 
   def check_for_push(self, entities):
-    print "check push"
-    print "mine", self.x, self.y, self.size
-    for e in entities.get("pushable"):
-      print e.x, e.y, e.size
     pushblock = entities.get("pushable", "wall", lambda x: x.touches_rect(self.bigger_rect(self.direction)))
     if len(pushblock) == 0: return
 
@@ -1473,8 +1468,6 @@ class Character(Entity):
     if entities.any("you-win", lambda e: e.can_win and e.touches_rect(self)):
       global you_win_override
       you_win_override = False
-
-      print "you win!"
 
   def update(self, entities):
     self.x = int(self.x)
@@ -1625,7 +1618,7 @@ def main():
 
   m = Map()
   if DEBUG:
-    m.new_map_abs(manager, 5, 1)
+    m.new_map_abs(manager, 5, 3)
   else:
     m.new_map_abs(manager, 0, 0)
 
@@ -1649,7 +1642,7 @@ def main():
     dark_sound.set_volume(0.0)
 
     global land_sound
-    land_sound = pygame.mixer.Sound("land or hurt.wav")
+    land_sound = pygame.mixer.Sound("land.wav")
 
     global jump_sound
     jump_sound = pygame.mixer.Sound("jump.wav")

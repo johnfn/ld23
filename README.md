@@ -2,7 +2,15 @@
 
 This game is DONE.
 
-There are probably a few gnarly bugs left, and there's probably at least one way to get yourself into an unwinnable situation. I'm going to be ironing out any game-killing stuff and making ports soon (24h).
+## How to get py2app to work 
+
+It's really hard.
+
+First, run `mac_setup`.
+
+Then, go into the generated app, find `__boot__.py` and insert the following line into the `_run` method.
+
+    sys.path.insert(0, os.path.join(base, 'lib', 'python2.5', 'lib-dynload'))
 
 ## Compiling from source on OSX:
 

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+## Remove previous builds.  Start with clean slate.
+rm -rf build dist
+
+## Force python into 32 bit mode.
+export VERSIONER_PYTHON_PREFER_32_BIT=yes
+
+echo `which python`
+
+python setup.py py2app --resources=jump.wav,laderp.bmp,land.wav,nokiafc22.ttf,shoot.wav,soundtrack-normal.ogg,soundtrack-dark.ogg,tiles.bmp,tiles.png
