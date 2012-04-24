@@ -62,7 +62,7 @@ going_insane = False
 
 DEBUG = False
 
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.set_mode((WIDTH * 2, HEIGHT * 2))
 
 def get_uid():
   get_uid.uid += 1
@@ -1583,7 +1583,7 @@ class Character(Entity):
     if self.sanity <= 0:
       self.soft_death(entities)
 
-def render_all(manager, lag = CAM_LAG):
+def render_all(buff, manager, lag = CAM_LAG):
   global cam_lag_override
   if cam_lag_override != 0:
     lag = cam_lag_override
@@ -1601,9 +1601,9 @@ def render_all(manager, lag = CAM_LAG):
 
   for e in sorted(manager.get("renderable"), key=lambda x: x.depth()):
     if "relative" in e.groups:
-      e.render(screen, CHAR_XY-x_ofs, CHAR_XY-y_ofs)
+      e.render(buff, CHAR_XY-x_ofs, CHAR_XY-y_ofs)
     else:
-      e.render(screen, 0, 0)
+      e.render(buff, 0, 0)
 
 render_all.old_xofs = 40
 render_all.old_yofs = 40
@@ -1629,6 +1629,8 @@ def main():
 
   normal_sound = None
   dark_sound = None
+
+  buff = pygame.Surface((300, 300))
 
   if not DEBUG:
     pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024)
@@ -1686,7 +1688,9 @@ def main():
 
     screen.fill((0, 0, 0))
 
-    render_all(manager)
+    render_all(buff, manager)
+
+    screen.blit(pygame.transform.scale(buff, (300 * 2, 300 * 2)), buff.get_rect())
 
     pygame.display.flip()
 
